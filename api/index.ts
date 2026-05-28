@@ -25,8 +25,8 @@ const getGeminiClient = () => {
   });
 };
 
-// Simple HTML text stripper to scrape key content safely from URLs
-async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
+// Combined fast single-fetch HTML helper to scrape context + logo in one go
+async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string; logoUrl: string }> {
   let timeoutId: any = null;
   try {
     const formattedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
@@ -36,11 +36,11 @@ async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
       try {
         controller.abort();
       } catch (_) {}
-    }, 1200); // 1.2 second limit for extreme fast Vercel serverless compliance
+    }, 1400); // Strict 1.4 seconds timeout limit to leave ample budget for Gemini
 
     const response = await fetch(formattedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Client/AuraMotion',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
       },
       signal: controller.signal,
@@ -51,92 +51,79 @@ async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
     }
     
     if (!response.ok) {
-      throw new Error(`HTTP status ${response.status}`);
+      const origin = new URL(formattedUrl).origin;
+      return { 
+        context: `[HTTP Status ${response.status}]`, 
+        logoUrl: `${origin}/favicon.ico` 
+      };
     }
-    
-    const html = await response.text();
-    // basic strip tags
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1] : '';
-    
-    // Get paragraphs text
-    const paragraphs: string[] = [];
-    const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-    let match;
-    let charCount = 0;
-    while ((match = pRegex.exec(html)) !== null && charCount < 1000) {
-      const text = match[1]
-        .replace(/<[^>]*>/g, '') // remove inner tags
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (text.length > 20) {
-        paragraphs.push(text);
-        charCount += text.length;
-      }
-    }
-
-    return `Title: ${title}\nContent:\n${paragraphs.slice(0, 5).join('\n').substring(0, 1000)}`;
-  } catch (error: any) {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    console.error(`Scraping failed for ${targetUrl}:`, error.message);
-    return `[Failed to read raw HTML directly: ${error.message}]`;
-  }
-}
-
-// Extract logo dynamically from URL using HTML analysis
-async function extractLogoFromUrl(targetUrl: string): Promise<string> {
-  let timeoutId: any = null;
-  try {
-    const formattedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
-    
-    const controller = new AbortController();
-    timeoutId = setTimeout(() => {
-      try {
-        controller.abort();
-      } catch (_) {}
-    }, 1200);
-
-    const response = await fetch(formattedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-      },
-      signal: controller.signal,
-    });
-    
-    if (timeoutId) clearTimeout(timeoutId);
-    if (!response.ok) return "";
     
     const html = await response.text();
     const origin = new URL(formattedUrl).origin;
     
-    // 1. Look for custom img tags that contain logo in their src or class name
+    // 1. Extract Title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+    
+    // 2. Extract Key Paragraphs (constrained count to minimize context token bloating and speed up model)
+    const paragraphs: string[] = [];
+    const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    let match;
+    let charCount = 0;
+    while ((match = pRegex.exec(html)) !== null && charCount < 600) {
+      const text = match[1]
+        .replace(/<[^>]*>/g, '') // strip nested tags
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text.length > 25) {
+        paragraphs.push(text);
+        charCount += text.length;
+      }
+    }
+    
+    const contextText = `Title: ${title}\nContent:\n${paragraphs.slice(0, 4).join('\n').substring(0, 600)}`;
+    
+    // 3. Extract Logo from same HTML buffer
+    let logoUrl = "";
+    // Custom img tags for brand/logo match
     const logoImgRegex = /<img[^>]*src="([^"]*(?:logo|icon|brand)[^"]*\.(?:png|jpg|jpeg|svg|webp))"/i;
     const matchLogo = html.match(logoImgRegex);
     if (matchLogo) {
-      let url = matchLogo[1];
-      if (url.startsWith('/')) {
-        url = url.startsWith('//') ? `https:${url}` : `${origin}${url}`;
+      logoUrl = matchLogo[1];
+    } else {
+      // Touch icon hrefs
+      const iconRegex = /<link[^>]*rel="(?:shortcut )?icon"[^>]*href="([^"]+)"/i;
+      const matchIcon = html.match(iconRegex);
+      if (matchIcon) {
+        logoUrl = matchIcon[1];
       }
-      return url;
     }
     
-    // 2. Look for touch icons/favicons
-    const iconRegex = /<link[^>]*rel="(?:shortcut )?icon"[^>]*href="([^"]+)"/i;
-    const matchIcon = html.match(iconRegex);
-    if (matchIcon) {
-      let url = matchIcon[1];
-      if (url.startsWith('/')) {
-        url = url.startsWith('//') ? `https:${url}` : `${origin}${url}`;
+    if (logoUrl) {
+      if (logoUrl.startsWith('/')) {
+        logoUrl = logoUrl.startsWith('//') ? `https:${logoUrl}` : `${origin}${logoUrl}`;
       }
-      return url;
+    } else {
+      logoUrl = `${origin}/favicon.ico`;
     }
     
-    return `${origin}/favicon.ico`;
-  } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId);
-    return "";
+    return {
+      context: contextText,
+      logoUrl: logoUrl
+    };
+  } catch (error: any) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    console.error(`Single-pass scraping failed for ${targetUrl}:`, error.message);
+    let resolvedFavicon = "";
+    try {
+      resolvedFavicon = `${new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`).origin}/favicon.ico`;
+    } catch (_) {}
+    return {
+      context: `[Scrape limit exceeded: ${error.message}]`,
+      logoUrl: resolvedFavicon
+    };
   }
 }
 
@@ -196,12 +183,9 @@ app.post("/api/generate-storyboard", async (req, res) => {
     if (url && url.trim().length > 3) {
       console.log(`Analyzing url: ${url}`);
       try {
-        const [context, logo] = await Promise.all([
-          fetchAndExtractUrlContent(url),
-          extractLogoFromUrl(url)
-        ]);
-        scrapedContext = context;
-        scrapedLogoUrl = logo;
+        const result = await fetchAndAnalyzeUrl(url);
+        scrapedContext = result.context;
+        scrapedLogoUrl = result.logoUrl;
       } catch (err: any) {
         console.error("Scraping details failed:", err.message);
       }
