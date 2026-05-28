@@ -40,6 +40,10 @@ export interface ProjectSettings {
   aspectRatio: AspectRatio;
   visualTheme: 'modern-dark' | 'neon-pulse' | 'warm-editorial' | 'clean-corporate' | 'brutalist-yellow';
   exportFormat: 'mp4' | 'gif' | 'web-canvas';
+  logoUrl?: string; // Brand logo URL to render in video corner
+  avatarUrl?: string; // Interactive talking presenter avatar URL or file
+  avatarStyle?: 'none' | 'floating' | 'split-screen' | 'podcast-bubble'; // Avatar rendering layout style
+  avatarPresetName?: string; // Prebuilt professional name e.g. "Sarah" or "David"
 }
 
 export interface Project {

@@ -97,13 +97,51 @@ export const SAMPLE_SOURCE_EXAMPLES = [
   }
 ];
 
+export interface AvatarPreset {
+  id: string;
+  name: string;
+  role: string;
+  imageUrl: string;
+}
+
+export const PRESET_AVATARS: AvatarPreset[] = [
+  {
+    id: "sarah",
+    name: "Sarah (Tech)",
+    role: "Directrice Tech & SaaS",
+    imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80"
+  },
+  {
+    id: "david",
+    name: "David (Business)",
+    role: "Partenaire Business & Finance",
+    imageUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80"
+  },
+  {
+    id: "emma",
+    name: "Emma (Impact)",
+    role: "Responsable RSE & Stratégie",
+    imageUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80"
+  },
+  {
+    id: "thomas",
+    name: "Thomas (SaaS)",
+    role: "Concepteur Produit & Marketing",
+    imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+  }
+];
+
 // High-fidelity fallback storyboard used before any API requests succeed
 export const DEFAULT_PROJECT: Project = {
   settings: {
     name: "Aura Motion Campaign",
     aspectRatio: "9:16",
     visualTheme: "modern-dark",
-    exportFormat: "web-canvas"
+    exportFormat: "web-canvas",
+    logoUrl: "", // initialized blank, customizable by user
+    avatarUrl: "", // customizable with custom url
+    avatarStyle: "none", // customized presenter avatar setup
+    avatarPresetName: ""
   },
   scenes: [
     {

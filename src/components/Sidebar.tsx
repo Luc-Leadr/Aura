@@ -11,7 +11,14 @@ import {
   Video,
   Languages
 } from "lucide-react";
-import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES } from "../constants";
+import { 
+  Smile, 
+  Upload, 
+  Plus,
+  User,
+  Tags
+} from "lucide-react";
+import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS } from "../constants";
 import { ProjectSettings, AspectRatio } from "../types";
 
 interface SidebarProps {
@@ -224,6 +231,146 @@ export default function Sidebar({
                   <Monitor className="w-3.5 h-3.5 text-indigo-600" /> Paysage (16:9 LinkedIn/Web)
                 </button>
               </div>
+            </div>
+
+            {/* Logo de l'Entreprise */}
+            <div className="space-y-2 border-t border-slate-100 pt-4">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Logo de la Marque</span>
+                <span className="text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-semibold uppercase">Auto-Scrapé / Custom</span>
+              </label>
+              
+              <div className="flex gap-2">
+                <input
+                  id="input-logo-url"
+                  type="text"
+                  placeholder="Collez l'URL de votre logo..."
+                  value={settings.logoUrl || ""}
+                  onChange={(e) => onUpdateSettings({ ...settings, logoUrl: e.target.value })}
+                  className="flex-1 bg-white border border-slate-200 text-slate-800 rounded-lg py-2 px-3 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none shadow-sm"
+                />
+                
+                {settings.logoUrl && (
+                  <div className="relative flex items-center justify-center bg-slate-100 border border-slate-200 rounded-lg p-1.5 w-9 h-9 flex-shrink-0">
+                    <img 
+                      src={settings.logoUrl} 
+                      alt="Logo" 
+                      className="max-w-full max-h-full object-contain rounded"
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => onUpdateSettings({ ...settings, logoUrl: "" })}
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center shadow-sm cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                S'affichera de manière professionnelle au coin du plan pour asseoir la légitimité commerciale.
+              </p>
+            </div>
+
+            {/* Avatar Présentateur / Personnification */}
+            <div className="space-y-3.5 border-t border-slate-100 pt-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-indigo-600" /> Présentateur (Avatar Parlant)
+                </label>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Ajoutez un visage animé synchronisé aux paroles pour personnifier votre communication.
+                </p>
+              </div>
+
+              {/* Presenter Visual Types */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: 'none', label: 'Aucun' },
+                  { id: 'floating', label: 'Bulle' },
+                  { id: 'split-screen', label: 'Split' },
+                  { id: 'podcast-bubble', label: 'Podcast' }
+                ].map((style) => {
+                  const isActive = (settings.avatarStyle || 'none') === style.id;
+                  return (
+                    <button
+                      id={`avatar-style-${style.id}`}
+                      key={style.id}
+                      type="button"
+                      onClick={() => onUpdateSettings({ 
+                        ...settings, 
+                        avatarStyle: style.id as any,
+                        // If turning on and no preset is selected, default to Sarah
+                        avatarUrl: style.id !== 'none' && !settings.avatarUrl ? PRESET_AVATARS[0].imageUrl : settings.avatarUrl,
+                        avatarPresetName: style.id !== 'none' && !settings.avatarPresetName ? PRESET_AVATARS[0].name : settings.avatarPresetName
+                      })}
+                      className={`py-1.5 rounded text-[10px] font-bold border transition-all text-center cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
+                          : 'bg-white border-slate-200 text-slate-600 hover:text-slate-800'
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* If Presenter is enabled, show avatar profile selection & customs */}
+              {settings.avatarStyle && settings.avatarStyle !== 'none' && (
+                <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200/65 animate-in fade-in duration-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Présentateur Pro</span>
+                  
+                  {/* Grid of presets */}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {PRESET_AVATARS.map((av) => {
+                      const isActive = (settings.avatarPresetName === av.name) || (settings.avatarUrl === av.imageUrl);
+                      return (
+                        <button
+                          id={`btn-preset-av-${av.id}`}
+                          key={av.id}
+                          type="button"
+                          onClick={() => onUpdateSettings({
+                            ...settings,
+                            avatarUrl: av.imageUrl,
+                            avatarPresetName: av.name
+                          })}
+                          className={`flex flex-col items-center gap-1 p-1 rounded-lg border transition-all cursor-pointer ${
+                            isActive 
+                              ? 'bg-white border-indigo-500/80 ring-2 ring-indigo-500/10' 
+                              : 'hover:bg-white border-transparent'
+                          }`}
+                        >
+                          <img 
+                            src={av.imageUrl} 
+                            alt={av.name} 
+                            className="w-8 h-8 rounded-full object-cover border border-slate-250 shadow-sm"
+                          />
+                          <span className="text-[8px] font-bold text-slate-700 text-center truncate w-full">{av.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Or Custom Avatar URL */}
+                  <div className="space-y-1 pt-1.5 border-t border-slate-200/50">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">Ou URL de votre photo</span>
+                    <input
+                      id="input-custom-avatar"
+                      type="text"
+                      placeholder="Collez l'URL d'un visage..."
+                      value={settings.avatarUrl || ""}
+                      onChange={(e) => onUpdateSettings({ 
+                        ...settings, 
+                        avatarUrl: e.target.value,
+                        avatarPresetName: "Custom"
+                      })}
+                      className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-[10px] focus:ring-1 focus:ring-indigo-500/20 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Primary Generation Call */}

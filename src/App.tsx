@@ -136,13 +136,20 @@ export default function App() {
         const safeSlogan = typeof outcome.suggestedSlogan === 'string' ? outcome.suggestedSlogan : "";
         const safeTone = typeof outcome.detectedTone === 'string' ? outcome.detectedTone : "";
 
+        const savedLogo = outcome.scrapedLogoUrl || project.settings.logoUrl;
+
         setProject({
           settings: {
             ...project.settings,
-            name: safeSlogan ? `Aura - ${safeSlogan.substring(0, 15)}...` : project.settings.name
+            name: safeSlogan ? `Aura - ${safeSlogan.substring(0, 15)}...` : project.settings.name,
+            logoUrl: savedLogo
           },
           scenes: formattedScenes
         });
+
+        if (savedLogo) {
+          setGenerationLogs(prev => [...prev, `✨ Charte graphique & Logo de marque intégrés avec succès.`]);
+        }
 
         if (safeSlogan) setFeedbackSlogan(safeSlogan);
         if (safeTone) setFeedbackTone(safeTone);

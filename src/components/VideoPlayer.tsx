@@ -136,39 +136,47 @@ export default function VideoPlayer({
         if (!ctx || ctx.state === 'suspended') return;
         
         try {
-          // Play oscillator wave
+          // Play oscillator wave with rich stereo spatial echo delay
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           
+          const delayNode = ctx.createDelay();
+          const feedbackNode = ctx.createGain();
+          
+          // 400ms echo feedback loop
+          delayNode.delayTime.setValueAtTime(0.4, ctx.currentTime);
+          feedbackNode.gain.setValueAtTime(vibe === 'techno' ? 0.2 : 0.45, ctx.currentTime);
+
           // Select note from chord based on step
           const noteFreq = chordNotes[step % chordNotes.length];
           osc.frequency.setValueAtTime(noteFreq, ctx.currentTime);
           
           if (vibe === 'techno') {
             osc.type = 'sawtooth';
-            gain.gain.setValueAtTime(0.02, ctx.currentTime);
+            gain.gain.setValueAtTime(0.015, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.3);
           } else if (vibe === 'lofi') {
             osc.type = 'triangle';
-            gain.gain.setValueAtTime(0.05, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.7);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.8);
+            gain.gain.setValueAtTime(0.045, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.85);
           } else {
             osc.type = 'sine';
-            gain.gain.setValueAtTime(0.06, ctx.currentTime);
+            gain.gain.setValueAtTime(0.05, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.8);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 2);
           }
+
+          // Route to speakers AND the echo line
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          gain.connect(delayNode);
+          delayNode.connect(feedbackNode);
+          feedbackNode.connect(delayNode);
+          feedbackNode.connect(ctx.destination);
+
+          osc.start();
+          const stopOffset = vibe === 'techno' ? 0.3 : vibe === 'lofi' ? 0.95 : 2.0;
+          osc.stop(ctx.currentTime + stopOffset);
 
           step++;
         } catch (err) {
@@ -435,11 +443,23 @@ export default function VideoPlayer({
           </div>
 
           {/* Slogan Watermark label */}
-          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-black/15 backdrop-blur-sm px-2.5 py-1.5 rounded-xl border border-white/5">
-            <span className="text-[9px] font-mono font-bold text-white/50 tracking-widest uppercase">
-              {project.settings.name}
-            </span>
-            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/20 text-white font-mono">
+          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-black/25 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 shadow-sm">
+            <div className="flex items-center gap-2 overflow-hidden max-w-[70%]">
+              {project.settings.logoUrl ? (
+                <img 
+                  src={project.settings.logoUrl} 
+                  alt="Logo" 
+                  className="h-3.5 object-contain rounded opacity-90 brightness-110"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              )}
+              <span className="text-[9px] font-mono font-bold text-white/80 tracking-widest uppercase truncate">
+                {project.settings.name}
+              </span>
+            </div>
+            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/15 text-white font-mono font-bold flex-shrink-0">
               SCENE {activeSceneIndex + 1}
             </span>
           </div>
@@ -474,6 +494,88 @@ export default function VideoPlayer({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Presenter Avatars Overlays */}
+            {project.settings.avatarStyle === 'floating' && project.settings.avatarUrl && (
+              <div className="absolute bottom-16 right-4 z-20 flex flex-col items-center">
+                <div className="relative">
+                  {isPlaying && (
+                    <motion.div 
+                      className="absolute -inset-1.5 rounded-full bg-indigo-500/30 filter blur-[1px]"
+                      animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.8, 0.4] }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  )}
+                  <img 
+                    src={project.settings.avatarUrl} 
+                    alt="Presenter" 
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-lg relative"
+                  />
+                  {isPlaying && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border border-white rounded-full flex items-center justify-center">
+                      <span className="w-1 h-1 bg-white rounded-full animate-ping" />
+                    </span>
+                  )}
+                </div>
+                <span className="text-[8px] bg-black/60 text-white font-bold py-0.5 px-1.5 rounded-full mt-1.5 border border-white/10 uppercase tracking-wide">
+                  {project.settings.avatarPresetName || "Présentateur"}
+                </span>
+              </div>
+            )}
+
+            {project.settings.avatarStyle === 'split-screen' && project.settings.avatarUrl && (
+              <div className="w-full mt-4 flex justify-center z-10 animate-in fade-in-50 duration-350">
+                <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md p-1.5 rounded-xl border border-white/10 w-full max-w-[200px]">
+                  <div className="relative flex-shrink-0">
+                    {isPlaying && (
+                      <motion.div 
+                        className="absolute inset-0 rounded-full bg-indigo-500/40 scale-125 filter blur-[1px]"
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 0.9, repeat: Infinity }}
+                      />
+                    )}
+                    <img 
+                      src={project.settings.avatarUrl} 
+                      alt="Presenter" 
+                      className="w-8 h-8 rounded-full object-cover border border-white/20"
+                    />
+                  </div>
+                  <div className="text-left overflow-hidden">
+                    <p className="text-[9px] font-bold text-white truncate leading-tight">
+                      {project.settings.avatarPresetName || "Présentateur"}
+                    </p>
+                    <p className="text-[7px] text-indigo-300 font-semibold uppercase tracking-wider leading-none mt-0.5 animate-pulse">
+                      • parole en cours
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {project.settings.avatarStyle === 'podcast-bubble' && project.settings.avatarUrl && (
+              <div className="absolute top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-15 flex flex-col items-center justify-center animate-in scale-in duration-300">
+                <div className="relative">
+                  {/* Dynamic sound wave ring expansion */}
+                  {[...Array(isPlaying ? 3 : 0)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute inset-0 rounded-full border border-indigo-400/50"
+                      initial={{ scale: 1, opacity: 0.8 }}
+                      animate={{ scale: 2.1, opacity: 0 }}
+                      transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.6 }}
+                    />
+                  ))}
+                  <img
+                    src={project.settings.avatarUrl}
+                    alt="Host"
+                    className="w-16 h-16 rounded-full object-cover border-4 border-white/25 shadow-2xl relative"
+                  />
+                </div>
+                <span className="text-[9px] font-mono font-extrabold text-[#fcd34d] tracking-widest uppercase mt-2.5 filter drop-shadow">
+                  🎙️ {project.settings.avatarPresetName || "Hôte"}
+                </span>
+              </div>
+            )}
 
             {/* Simulated sound waves bar */}
             {isPlaying && (

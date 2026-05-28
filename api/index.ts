@@ -85,6 +85,61 @@ async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
   }
 }
 
+// Extract logo dynamically from URL using HTML analysis
+async function extractLogoFromUrl(targetUrl: string): Promise<string> {
+  let timeoutId: any = null;
+  try {
+    const formattedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
+    
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch (_) {}
+    }, 1200);
+
+    const response = await fetch(formattedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+      },
+      signal: controller.signal,
+    });
+    
+    if (timeoutId) clearTimeout(timeoutId);
+    if (!response.ok) return "";
+    
+    const html = await response.text();
+    const origin = new URL(formattedUrl).origin;
+    
+    // 1. Look for custom img tags that contain logo in their src or class name
+    const logoImgRegex = /<img[^>]*src="([^"]*(?:logo|icon|brand)[^"]*\.(?:png|jpg|jpeg|svg|webp))"/i;
+    const matchLogo = html.match(logoImgRegex);
+    if (matchLogo) {
+      let url = matchLogo[1];
+      if (url.startsWith('/')) {
+        url = url.startsWith('//') ? `https:${url}` : `${origin}${url}`;
+      }
+      return url;
+    }
+    
+    // 2. Look for touch icons/favicons
+    const iconRegex = /<link[^>]*rel="(?:shortcut )?icon"[^>]*href="([^"]+)"/i;
+    const matchIcon = html.match(iconRegex);
+    if (matchIcon) {
+      let url = matchIcon[1];
+      if (url.startsWith('/')) {
+        url = url.startsWith('//') ? `https:${url}` : `${origin}${url}`;
+      }
+      return url;
+    }
+    
+    return `${origin}/favicon.ico`;
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+    return "";
+  }
+}
+
 // Safely extract JSON structure even if code blocks or markdown surrounds it
 function safeExtractJson(text: string): any {
   if (!text) return {};
@@ -137,9 +192,19 @@ app.post("/api/generate-storyboard", async (req, res) => {
     const ai = getGeminiClient();
 
     let scrapedContext = "";
+    let scrapedLogoUrl = "";
     if (url && url.trim().length > 3) {
       console.log(`Analyzing url: ${url}`);
-      scrapedContext = await fetchAndExtractUrlContent(url);
+      try {
+        const [context, logo] = await Promise.all([
+          fetchAndExtractUrlContent(url),
+          extractLogoFromUrl(url)
+        ]);
+        scrapedContext = context;
+        scrapedLogoUrl = logo;
+      } catch (err: any) {
+        console.error("Scraping details failed:", err.message);
+      }
     }
 
     // Construct guidance for the script - ultra clean & lightweight for Vercel Hobby stability (speed)
@@ -251,7 +316,11 @@ Please design the 3 scenes logically so they flow nicely from a hook (Scene 1) t
     });
 
     const parsedData = safeExtractJson(response.text?.trim() || "{}");
-    res.json(parsedData);
+    // Inject brand logo and colors dynamically so client receives them automatically
+    res.json({
+      ...parsedData,
+      scrapedLogoUrl: scrapedLogoUrl || ""
+    });
   } catch (error: any) {
     console.error("Storyboard generation error:", error);
     res.status(500).json({ error: error.message || "An error occurred during AI generation." });
