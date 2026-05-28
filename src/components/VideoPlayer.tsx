@@ -344,23 +344,35 @@ export default function VideoPlayer({
   };
 
   const getAccentWordMarkup = (text: string | undefined | null, accent?: string | null, textStyle?: string) => {
-    if (!text) return <span></span>;
-    if (!accent || !text.toLowerCase().includes(accent.toLowerCase())) return <span>{text}</span>;
-    const parts = text.split(new RegExp(`(${accent})`, 'gi'));
+    if (!text) return <span key="empty"></span>;
+    if (!accent || !text.toLowerCase().includes(accent.toLowerCase())) {
+      return <span key="plain">{text}</span>;
+    }
+    // Safely escape regex characters to prevent runtime crashes if the accent word has special punctuation
+    const escapedAccent = accent.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escapedAccent})`, 'gi'));
     return (
-      <span>
-        {parts.map((part, i) => 
-          part && part.toLowerCase() === accent.toLowerCase() ? (
-            <span 
-              key={i} 
-              className={`font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-fuchsia-400 border-b-2 border-fuchsia-500/40 relative px-1 mx-0.5 rounded ${
-                textStyle === 'cyber' ? 'shadow-fuchsia-500/20' : ''
-              }`}
-            >
-              {part}
-            </span>
-          ) : part
-        )}
+      <span key="segmented">
+        {parts.map((part, i) => {
+          if (!part) return null;
+          const isAccent = part.toLowerCase() === accent.toLowerCase();
+          if (isAccent) {
+            return (
+              <span 
+                key={`accent-${i}`} 
+                className={`font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-fuchsia-400 border-b-2 border-fuchsia-500/40 relative px-1 mx-0.5 rounded ${
+                  textStyle === 'cyber' ? 'shadow-fuchsia-500/20' : ''
+                }`}
+              >
+                {part}
+              </span>
+            );
+          } else {
+            return (
+              <span key={`text-${i}`}>{part}</span>
+            );
+          }
+        })}
       </span>
     );
   };
