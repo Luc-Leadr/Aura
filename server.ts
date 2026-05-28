@@ -118,6 +118,19 @@ function safeExtractJson(text: string): any {
   }
 }
 
+// Health Check API to diagnostic boot-time status and env variables
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    environment: {
+      hasApiKey: !!process.env.GEMINI_API_KEY,
+      isVercel: !!process.env.VERCEL,
+      nodeVersion: process.version,
+      nodeEnv: process.env.NODE_ENV || "development"
+    }
+  });
+});
+
 // 1. Generate Storyboard / Script API
 app.post("/api/generate-storyboard", async (req, res) => {
   try {
@@ -135,13 +148,13 @@ app.post("/api/generate-storyboard", async (req, res) => {
 You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context) and generate a highly engaging, high-conversion short-form video storyboard/script.
 
 The output will be used to animate a video preview timeline.
-Generate between 3 to 5 distinct scenes/slides.
-The total duration should target around 15 to 30 seconds.
+Generate exactly 3 highly polished distinct scenes/slides (Scene 1: Hook, Scene 2: Problem/Core Value, Scene 3: Strong Call to Action). Keep titles and descriptions extremely concise to optimize loading performance.
+The total duration should target around 15 seconds (5 seconds per scene).
 The tone of voice config should match the theme and tone of the requested vibe: "${scriptVibe || 'energentic marketing'}".
 Brand/Theme request: "${visualTheme || 'modern-dark'}".
 
 Each scene needs:
-- A spoken narrator subtitle (between 10 and 20 words per scene, fluid, hooky, and punchy).
+- A spoken narrator subtitle (between 8 and 15 words per scene, fluid, hooky, and punchy).
 - A corresponding visual layout guide:
   - 'title': A short punchy text to render in large bold display typography.
   - 'subtitle': Optional secondary contextual text.
@@ -166,7 +179,7 @@ URL domain or brand: "${url || 'No URL supplied'}"
 Target Aspect Ratio: "${aspectRatio || '9:16'}"
 Chosen Style Palette: "${visualTheme || 'modern-dark'}"
 
-Please design the scenes logically so they flow nicely from a hook (Scene 1) to problem definition/solution (Scene 2/3) and a strong Call to Action (Final Scene).
+Please design the 3 scenes logically so they flow nicely from a hook (Scene 1) to problem definition/solution (Scene 2) and a strong Call to Action (Scene 3). Keep it concise!
 `;
 
     const response = await ai.models.generateContent({
@@ -177,6 +190,7 @@ Please design the scenes logically so they flow nicely from a hook (Scene 1) to 
       ],
       config: {
         responseMimeType: "application/json",
+        temperature: 0.1,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
