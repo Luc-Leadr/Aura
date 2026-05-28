@@ -1,0 +1,350 @@
+import { useState } from "react";
+import { 
+  Sparkles, 
+  HelpCircle, 
+  AlertCircle, 
+  Download, 
+  Check, 
+  RefreshCw,
+  Film,
+  Database,
+  SlidersHorizontal,
+  Info
+} from "lucide-react";
+import Sidebar from "./components/Sidebar";
+import VideoPlayer from "./components/VideoPlayer";
+import Timeline from "./components/Timeline";
+import ControlPanel from "./components/ControlPanel";
+import { DEFAULT_PROJECT } from "./constants";
+import { Project, ProjectSettings, Scene } from "./types";
+
+export default function App() {
+  const [project, setProject] = useState<Project>(DEFAULT_PROJECT);
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  
+  // Applet lifecycle state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationLogs, setGenerationLogs] = useState<string[]>([]);
+  const [feedbackSlogan, setFeedbackSlogan] = useState<string>("Maximez l'impact de votre communication");
+  const [feedbackTone, setFeedbackTone] = useState<string>("Sérieux, technologique et percutant");
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  // Video render Simulation modal
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStepMessage, setExportStepMessage] = useState("");
+
+  const handleUpdateSettings = (newSettings: ProjectSettings) => {
+    setProject(prev => ({
+      ...prev,
+      settings: newSettings
+    }));
+  };
+
+  const handleUpdateScenes = (newScenes: Scene[]) => {
+    setProject(prev => ({
+      ...prev,
+      scenes: newScenes
+    }));
+    // clamp active index if necessary
+    if (activeSceneIndex >= newScenes.length) {
+      setActiveSceneIndex(Math.max(0, newScenes.length - 1));
+    }
+  };
+
+  // Triggers main server analysis & storyboard creation endpoint
+  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string }) => {
+    setIsGenerating(true);
+    setGlobalError(null);
+    setGenerationLogs(["Initiation du moteur d'analyse sémantique...", "Connexion à Google Gemini Cloud..."]);
+    
+    try {
+      // Simulate real-time logs for visual reinforcement
+      const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+      
+      if (payload.url) {
+        setGenerationLogs(prev => [...prev, `Analyse du site web demandée : ${payload.url}`, "Tentative de scraping du code source HTML..."]);
+        await delay(600);
+      }
+      
+      setGenerationLogs(prev => [...prev, `Traitement avec Gemini 3.5-Flash sur l'intention : "${payload.prompt || 'Création libre'}"...`]);
+      await delay(700);
+
+      setGenerationLogs(prev => [...prev, "Génération des clips vidéos et de l'habillage graphique..."]);
+
+      const response = await fetch("/api/generate-storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: payload.prompt,
+          url: payload.url,
+          aspectRatio: project.settings.aspectRatio,
+          visualTheme: project.settings.visualTheme,
+          scriptVibe: payload.scriptVibe
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Le serveur a retourné une erreur (Code: ${response.status})`);
+      }
+
+      const outcome = await response.json();
+      
+      if (outcome.scenes && outcome.scenes.length > 0) {
+        // Refit response to local layout
+        const formattedScenes = outcome.scenes.map((scene: any, i: number) => ({
+          id: `ai-scene-${i}-${Date.now()}`,
+          duration: Number(scene.duration) || 5,
+          subtitle: scene.subtitle || "Message sous-titré généré par l'IA",
+          visual: {
+            title: scene.visual?.title || "AI MESSAGE",
+            subtitle: scene.visual?.subtitle || "",
+            accentWord: scene.visual?.accentWord || "",
+            backgroundColor: scene.visual?.backgroundColor || "bg-gradient-to-br from-[#0c0f1d] to-[#11162d]",
+            backgroundType: scene.visual?.backgroundType || "gradient",
+            textPosition: scene.visual?.textPosition || "center",
+            textStyle: scene.visual?.textStyle || "minimal",
+            animationType: scene.visual?.animationType || "fade",
+            assetKeywords: scene.visual?.assetKeywords || "neon abstract"
+          },
+          audio: {
+            voiceName: scene.audio?.voiceName || "Zephyr",
+            speechSpeed: scene.audio?.speechSpeed || 1,
+            backgroundMusicVibe: scene.audio?.backgroundMusicVibe || "lofi",
+            volume: 0.8
+          },
+          transition: scene.transition || "fade"
+        }));
+
+        setProject({
+          settings: {
+            ...project.settings,
+            name: outcome.suggestedSlogan ? `Aura - ${outcome.suggestedSlogan.substring(0, 15)}...` : project.settings.name
+          },
+          scenes: formattedScenes
+        });
+
+        if (outcome.suggestedSlogan) setFeedbackSlogan(outcome.suggestedSlogan);
+        if (outcome.detectedTone) setFeedbackTone(outcome.detectedTone);
+
+        setGenerationLogs(prev => [...prev, "✨ Storyboard compilé avec succès ! Chargement dans le séquenceur."]);
+        setActiveSceneIndex(0);
+        setCurrentTime(0);
+      } else {
+        throw new Error("Aucune séquence exploitable n'a été retournée par l'IA.");
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      setGlobalError(err.message || "Impossible de contacter l'agent de génération.");
+      setGenerationLogs(prev => [...prev, "❌ Échec de la génération. Rétablissement du scénario par défaut."]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Rewrite / polish dialogue via server IA API
+  const handlePolishWithAi = async (rawText: string): Promise<string> => {
+    try {
+      const response = await fetch("/api/polish-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: rawText })
+      });
+      if (!response.ok) {
+        throw new Error("Polish request failed");
+      }
+      const data = await response.json();
+      return data.polishedText || rawText;
+    } catch (e) {
+      console.warn("Could not polish text, using raw input", e);
+      return rawText;
+    }
+  };
+
+  // Custom simulation of high end file compilation and download
+  const handleSimulateExport = () => {
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportStepMessage("Vérification des codecs de rendu...");
+    
+    const steps = [
+      { prg: 15, msg: "Fusion des calques graphiques et dégradés CSS..." },
+      { prg: 35, msg: "Génération automatique des pistes vocales en waves..." },
+      { prg: 60, msg: "Synchronisation des sous-titres et micro-animations..." },
+      { prg: 80, msg: "Synthèse audio et mixage de la boucle musicale..." },
+      { prg: 95, msg: "Finalisation du fichier conteneur MP4 (H264/AAC)..." },
+      { prg: 100, msg: "Vidéo prête au téléchargement !" }
+    ];
+
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      if (currentStep >= steps.length) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsExporting(false);
+          // Trigger mock file download trigger
+          alert("Félicitations ! Votre clip publicitaire motion design a été compilé en local avec succès. Rendu complet disponible pour l'intégration TikTok.");
+        }, 1200);
+        return;
+      }
+
+      setExportProgress(steps[currentStep].prg);
+      setExportStepMessage(steps[currentStep].msg);
+      currentStep++;
+    }, 1100);
+  };
+
+  return (
+    <div id="aura-master-studio" className="flex h-screen bg-slate-50 text-slate-800 flex-col overflow-hidden font-sans">
+      
+      {/* Top Banner alert notifying about sandbox environment */}
+      <header className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <Film className="w-5 h-5 text-indigo-600" />
+          <span className="text-sm font-bold tracking-tight text-slate-800">Aura Motion Studio Dashboard</span>
+          <span className="text-[10px] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded text-indigo-600 font-semibold uppercase tracking-wider">
+            Mode Créatif Actif
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Quick Stats summaries */}
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200">
+            <span className="font-mono text-[10px] text-slate-400">TON DÉTECTÉ:</span>
+            <span className="font-bold text-slate-700 max-w-[120px] truncate">{feedbackTone}</span>
+          </div>
+
+          <button
+            id="btn-global-export"
+            onClick={handleSimulateExport}
+            disabled={isGenerating || isExporting}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" /> Exporter la Vidéo publicitaire
+          </button>
+        </div>
+      </header>
+
+      {/* Main workspace panels */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* Left Side: Campaign inputs / presets */}
+        <Sidebar
+          settings={project.settings}
+          onUpdateSettings={handleUpdateSettings}
+          onGenerateStoryboard={handleGenerateStoryboard}
+          isGenerating={isGenerating}
+        />
+
+        {/* Center Section: Video Preview Canvas + Log alerts + Séquence timeline */}
+        <main className="flex-1 flex flex-col bg-slate-100 justify-between overflow-hidden relative border-r border-slate-200/80">
+          
+          {/* Global error panel if exists */}
+          {globalError && (
+            <div className="m-4 p-3 bg-red-50 border border-red-200 text-red-900 rounded-xl flex items-start gap-2.5 text-xs">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Erreur de traitement sémantique</p>
+                <p className="text-[11px] text-red-700 mt-0.5">{globalError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* If generating, display a gorgeous abstract logs terminal screen */}
+          {isGenerating ? (
+            <div id="generation-loading-overlay" className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50/95 backdrop-blur z-30 space-y-6">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+                <Sparkles className="w-6 h-6 text-indigo-600 absolute inset-0 m-auto animate-pulse" />
+              </div>
+
+              <div className="text-center space-y-2 max-w-sm">
+                <h3 className="text-sm font-semibold text-slate-800">Analyse et Synthèse Sémantique</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  L'intelligence artificielle analyse le style de votre prompt ou les accroches de votre site web pour générer le story-board publicitaire.
+                </p>
+              </div>
+
+              {/* Progress dynamic debug logs */}
+              <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-[10px] text-slate-300 space-y-1.5 h-36 overflow-y-auto shadow-inner">
+                {generationLogs.map((log, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <span className="text-indigo-400 select-none">&gt;</span>
+                    <span className={log.includes('❌') ? 'text-red-400' : log.includes('✨') ? 'text-emerald-400' : 'text-slate-300'}>{log}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <VideoPlayer
+              project={project}
+              activeSceneIndex={activeSceneIndex}
+              setActiveSceneIndex={setActiveSceneIndex}
+              isPlaying={isPlaying}
+              setIsPlaying={setIsPlaying}
+              currentTime={currentTime}
+              setCurrentTime={setCurrentTime}
+            />
+          )}
+
+          {/* Bottom section: Sequence lists */}
+          <Timeline
+            project={project}
+            activeSceneIndex={activeSceneIndex}
+            setActiveSceneIndex={setActiveSceneIndex}
+            onUpdateScenes={handleUpdateScenes}
+          />
+        </main>
+
+        {/* Right Side: Specific Scene Details / Inspector */}
+        <ControlPanel
+          scene={project.scenes[activeSceneIndex]}
+          onChangeScene={(updatedScene) => {
+            const updated = [...project.scenes];
+            updated[activeSceneIndex] = updatedScene;
+            handleUpdateScenes(updated);
+          }}
+          onPolishWithAi={handlePolishWithAi}
+        />
+      </div>
+
+      {/* Simulator Exporting Modal */}
+      {isExporting && (
+        <div id="export-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white border border-slate-200 p-6 rounded-2xl shadow-2xl space-y-5 select-none">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                <Film className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Exportation du Rendu Publicitaire</h3>
+                <p className="text-xs text-slate-500 font-medium">Compilation de la vidéo de communication</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-slate-500">{exportStepMessage}</span>
+                <span className="text-indigo-600 font-bold">{exportProgress}%</span>
+              </div>
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-sm">
+                <div 
+                  style={{ width: `${exportProgress}%` }}
+                  className="h-full bg-indigo-600 transition-all duration-300 rounded"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 leading-relaxed text-center">
+              Le processeur assemble vos styles graphiques locaux, les transitions de sous-titres et déclenche la transcodation du conteneur vidéo final.
+            </p>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

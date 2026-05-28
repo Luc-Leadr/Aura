@@ -1,0 +1,6 @@
+{
+  "name": "Aura Motion",
+  "description": "Convert plain prompts, texts, or website URLs into high-fidelity animated marketing videos and motion designs with custom typography and speech simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
