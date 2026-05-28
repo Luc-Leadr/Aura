@@ -87,7 +87,22 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`Le serveur a retourné une erreur (Code: ${response.status})`);
+        let serverErrorMessage = "";
+        try {
+          const rawText = await response.text();
+          try {
+            const errPayload = JSON.parse(rawText);
+            if (errPayload && errPayload.error) {
+              serverErrorMessage = `: ${errPayload.error}`;
+            }
+          } catch (_) {
+            if (rawText) {
+              const cleanText = rawText.replace(/<\/?[^>]+(>|$)/g, " ").trim().substring(0, 150);
+              serverErrorMessage = `: ${cleanText}`;
+            }
+          }
+        } catch (_) {}
+        throw new Error(`Le serveur a retourné une erreur (Code: ${response.status})${serverErrorMessage}`);
       }
 
       const outcome = await response.json();

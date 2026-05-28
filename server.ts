@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -15,10 +14,10 @@ app.use(express.json());
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("WARNING: GEMINI_API_KEY environment variable is not set. AI services will fail.");
+    throw new Error("La clé API GEMINI_API_KEY n'est pas détectée ou n'a pas été propagée. Veuillez ajouter GEMINI_API_KEY dans vos variables d'environnement sur Vercel (Settings > Environment Variables) puis déclencher un nouveau déploiement (Redeploy dans l'onglet Deployments) pour que Vercel prenne en compte le changement.");
   }
   return new GoogleGenAI({
-    apiKey: apiKey || "dummy_key_for_build",
+    apiKey: apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -130,8 +129,6 @@ Please design the scenes logically so they flow nicely from a hook (Scene 1) to 
       ],
       config: {
         responseMimeType: "application/json",
-        // Combine Google search grounding to expand domain knowledge if scraping had blockages
-        tools: url ? [{ googleSearch: {} }] : undefined,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -297,6 +294,7 @@ Do not wrap in quotes or add metadata. Output only the refined sentence.
 // Integration with Vite
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -314,6 +312,14 @@ async function startServer() {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
+
+// Global error handling middleware to prevent unhandled crashes
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Express uncaught error handler:", err);
+  res.status(500).json({ 
+    error: err.message || "An unexpected server-side error occurred." 
+  });
+});
 
 if (!process.env.VERCEL) {
   startServer();
