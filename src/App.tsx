@@ -133,16 +133,19 @@ export default function App() {
           transition: scene.transition || "fade"
         }));
 
+        const safeSlogan = typeof outcome.suggestedSlogan === 'string' ? outcome.suggestedSlogan : "";
+        const safeTone = typeof outcome.detectedTone === 'string' ? outcome.detectedTone : "";
+
         setProject({
           settings: {
             ...project.settings,
-            name: outcome.suggestedSlogan ? `Aura - ${outcome.suggestedSlogan.substring(0, 15)}...` : project.settings.name
+            name: safeSlogan ? `Aura - ${safeSlogan.substring(0, 15)}...` : project.settings.name
           },
           scenes: formattedScenes
         });
 
-        if (outcome.suggestedSlogan) setFeedbackSlogan(outcome.suggestedSlogan);
-        if (outcome.detectedTone) setFeedbackTone(outcome.detectedTone);
+        if (safeSlogan) setFeedbackSlogan(safeSlogan);
+        if (safeTone) setFeedbackTone(safeTone);
 
         setGenerationLogs(prev => [...prev, "✨ Storyboard compilé avec succès ! Chargement dans le séquenceur."]);
         setActiveSceneIndex(0);

@@ -28,15 +28,28 @@ const getGeminiClient = () => {
 
 // Simple HTML text stripper to scrape key content safely from URLs
 async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
+  let timeoutId: any = null;
   try {
     const formattedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
+    
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch (_) {}
+    }, 2500); // 2.5 second limit for Vercel serverless compliance
+
     const response = await fetch(formattedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
       },
-      signal: AbortSignal.timeout(6000), // 6 second limit
+      signal: controller.signal,
     });
+    
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     
     if (!response.ok) {
       throw new Error(`HTTP status ${response.status}`);
@@ -65,8 +78,43 @@ async function fetchAndExtractUrlContent(targetUrl: string): Promise<string> {
 
     return `Title: ${title}\nContent:\n${paragraphs.slice(0, 10).join('\n')}`;
   } catch (error: any) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     console.error(`Scraping failed for ${targetUrl}:`, error.message);
     return `[Failed to read raw HTML directly: ${error.message}]`;
+  }
+}
+
+// Safely extract JSON structure even if code blocks or markdown surrounds it
+function safeExtractJson(text: string): any {
+  if (!text) return {};
+  let cleaned = text.trim();
+  
+  // Remove markdown code fences if present at the start and end
+  if (cleaned.startsWith("```")) {
+    const lines = cleaned.split("\n");
+    if (lines[0].startsWith("```")) {
+      lines.shift();
+    }
+    if (lines[lines.length - 1].startsWith("```")) {
+      lines.pop();
+    }
+    cleaned = lines.join("\n").trim();
+  }
+  
+  // Extract content strictly between the first '{' and the last '}'
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (err: any) {
+    console.error("Failed to parse extracted JSON:", cleaned, err);
+    throw new Error(`Structure JSON invalide retournée par l'IA: ${err.message}`);
   }
 }
 
@@ -189,7 +237,7 @@ Please design the scenes logically so they flow nicely from a hook (Scene 1) to 
       }
     });
 
-    const parsedData = JSON.parse(response.text?.trim() || "{}");
+    const parsedData = safeExtractJson(response.text?.trim() || "{}");
     res.json(parsedData);
   } catch (error: any) {
     console.error("Storyboard generation error:", error);

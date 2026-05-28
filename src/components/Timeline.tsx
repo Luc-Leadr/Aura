@@ -125,7 +125,7 @@ export default function Timeline({
               {/* Subtitle / text preview label */}
               <div className="space-y-1">
                 <h4 className="text-[11px] font-bold text-slate-800 line-clamp-1">
-                  {scene.visual.title || "Message vide"}
+                  {scene.visual?.title || "Message vide"}
                 </h4>
                 <p className="text-[10px] text-slate-500 font-medium line-clamp-2 leading-normal">
                   {scene.subtitle}

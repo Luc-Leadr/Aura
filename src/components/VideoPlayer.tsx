@@ -343,13 +343,14 @@ export default function VideoPlayer({
     }
   };
 
-  const getAccentWordMarkup = (text: string, accent?: string, textStyle?: string) => {
+  const getAccentWordMarkup = (text: string | undefined | null, accent?: string | null, textStyle?: string) => {
+    if (!text) return <span></span>;
     if (!accent || !text.toLowerCase().includes(accent.toLowerCase())) return <span>{text}</span>;
     const parts = text.split(new RegExp(`(${accent})`, 'gi'));
     return (
       <span>
         {parts.map((part, i) => 
-          part.toLowerCase() === accent.toLowerCase() ? (
+          part && part.toLowerCase() === accent.toLowerCase() ? (
             <span 
               key={i} 
               className={`font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-fuchsia-400 border-b-2 border-fuchsia-500/40 relative px-1 mx-0.5 rounded ${
@@ -405,8 +406,8 @@ export default function VideoPlayer({
           }`}
         >
           {/* Theme Gradient / Image Background */}
-          <div className={`absolute inset-0 z-0 ${currentScene?.visual.backgroundColor || themePreset.bgGradient}`}>
-            {currentScene?.visual.backgroundType === 'image' && currentScene.visual.assetKeywords && (
+          <div className={`absolute inset-0 z-0 ${currentScene?.visual?.backgroundColor || themePreset.bgGradient}`}>
+            {currentScene?.visual?.backgroundType === 'image' && currentScene?.visual?.assetKeywords && (
               <img
                 src={`https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=480&q=80&sig=${encodeURIComponent(currentScene.visual.assetKeywords)}`}
                 alt="Motion Background"
@@ -432,17 +433,17 @@ export default function VideoPlayer({
           </div>
 
           {/* Active Canvas Scene Renderer */}
-          <div className={`w-full h-full flex flex-col relative p-6 z-10 select-none ${getPositionClasses(currentScene?.visual.textPosition || 'center')}`}>
+          <div className={`w-full h-full flex flex-col relative p-6 z-10 select-none ${getPositionClasses(currentScene?.visual?.textPosition || 'center')}`}>
             <AnimatePresence mode="wait">
               {currentScene && (
                 <motion.div
                   key={currentScene.id}
-                  {...getAnimationProps(currentScene.visual.animationType)}
+                  {...getAnimationProps(currentScene.visual?.animationType || "fade")}
                   transition={{ duration: 0.5, ease: "easeOut" }}
                   className="w-full space-y-3.5 z-10"
                 >
                   {/* Category Helper Badge */}
-                  {currentScene.visual.subtitle && (
+                  {currentScene.visual?.subtitle && (
                     <div className="inline-block">
                       <span className={`text-[10px] tracking-widest uppercase py-1 px-3.5 rounded-full border border-white/10 text-white/70 bg-white/5 backdrop-blur-sm ${themePreset.font}`}>
                         {currentScene.visual.subtitle}
@@ -451,11 +452,11 @@ export default function VideoPlayer({
                   )}
 
                   {/* Heavy Impact Title */}
-                  <h2 className={`${getTextStyleClasses(currentScene.visual.textStyle)} ${themePreset.font} leading-snug`}>
+                  <h2 className={`${getTextStyleClasses(currentScene.visual?.textStyle || "minimal")} ${themePreset.font} leading-snug`}>
                     {getAccentWordMarkup(
-                      currentScene.visual.title, 
-                      currentScene.visual.accentWord, 
-                      currentScene.visual.textStyle
+                      currentScene.visual?.title, 
+                      currentScene.visual?.accentWord, 
+                      currentScene.visual?.textStyle
                     )}
                   </h2>
                 </motion.div>
