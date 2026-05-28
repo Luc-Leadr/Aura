@@ -63,7 +63,7 @@ export default function App() {
   };
 
   // Triggers main server analysis & storyboard creation endpoint
-  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string }) => {
+  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number }) => {
     setIsGenerating(true);
     setGlobalError(null);
     setGenerationLogs(["Initiation du moteur d'analyse sémantique...", "Connexion à Google Gemini Cloud..."]);
@@ -80,7 +80,7 @@ export default function App() {
       setGenerationLogs(prev => [...prev, `Traitement avec Gemini 3.5-Flash sur l'intention : "${payload.prompt || 'Création libre'}"...`]);
       await delay(700);
 
-      setGenerationLogs(prev => [...prev, "Génération des clips vidéos et de l'habillage graphique..."]);
+      setGenerationLogs(prev => [...prev, `Génération des ${payload.slideCount} diapositives de services de manière optimisée...`]);
 
       const response = await fetch("/api/generate-storyboard", {
         method: "POST",
@@ -90,7 +90,8 @@ export default function App() {
           url: payload.url,
           aspectRatio: project.settings.aspectRatio,
           visualTheme: project.settings.visualTheme,
-          scriptVibe: payload.scriptVibe
+          scriptVibe: payload.scriptVibe,
+          slideCount: payload.slideCount
         })
       });
 

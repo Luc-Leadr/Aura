@@ -1,4 +1,4 @@
-export type AspectRatio = '9:16' | '16:9';
+export type AspectRatio = '9:16' | '16:9' | '1:1';
 
 export type TextStyle = 'minimal' | 'impact' | 'bordered' | 'cyber' | 'serif' | 'duotone';
 
@@ -40,10 +40,12 @@ export interface ProjectSettings {
   aspectRatio: AspectRatio;
   visualTheme: 'modern-dark' | 'neon-pulse' | 'warm-editorial' | 'clean-corporate' | 'brutalist-yellow';
   exportFormat: 'mp4' | 'gif' | 'web-canvas';
-  logoUrl?: string; // Brand logo URL to render in video corner
+  logoUrl?: string; // Brand logo URL to render in video corner or base64 file
   avatarUrl?: string; // Interactive talking presenter avatar URL or file
   avatarStyle?: 'none' | 'floating' | 'split-screen' | 'podcast-bubble'; // Avatar rendering layout style
   avatarPresetName?: string; // Prebuilt professional name e.g. "Sarah" or "David"
+  platform?: 'tiktok' | 'instagram' | 'linkedin'; // Active distribution platform chosen by user
+  slideCount?: number; // Number of slides or services to present
 }
 
 export interface Project {

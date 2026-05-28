@@ -175,7 +175,7 @@ app.get("/api/health", (req, res) => {
 // 1. Generate Storyboard / Script API
 app.post("/api/generate-storyboard", async (req, res) => {
   try {
-    const { prompt, url, aspectRatio, visualTheme, scriptVibe } = req.body;
+    const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4 } = req.body;
     const ai = getGeminiClient();
 
     let scrapedContext = "";
@@ -191,13 +191,15 @@ app.post("/api/generate-storyboard", async (req, res) => {
       }
     }
 
+    const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
+
     // Construct guidance for the script - ultra clean & lightweight for Vercel Hobby stability (speed)
     const instruction = `
 You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context) and generate a highly engaging, high-conversion short-form video storyboard/script.
 
 The output will be used to animate a video preview timeline.
-Generate exactly 3 highly polished distinct scenes/slides (Scene 1: Hook, Scene 2: Problem/Core Value, Scene 3: Strong Call to Action). Keep titles and descriptions extremely concise to optimize loading performance.
-The total duration should target around 15 seconds (5 seconds per scene).
+Generate exactly ${slideCount} highly polished distinct scenes/slides corresponding to the core services, product benefits, or brand features of the user's business. Keep titles and descriptions extremely concise to optimize loading performance.
+Each scene duration should be exactly ${calculatedDuration} seconds.
 The tone of voice config should match the theme and tone of the requested vibe: "${scriptVibe || 'energentic marketing'}".
 Brand/Theme request: "${visualTheme || 'modern-dark'}".
 
@@ -227,7 +229,7 @@ URL domain or brand: "${url || 'No URL supplied'}"
 Target Aspect Ratio: "${aspectRatio || '9:16'}"
 Chosen Style Palette: "${visualTheme || 'modern-dark'}"
 
-Please design the 3 scenes logically so they flow nicely from a hook (Scene 1) to problem definition/solution (Scene 2) and a strong Call to Action (Scene 3). Keep it concise!
+Please design the exactly ${slideCount} scenes logically so they flow nicely from a hook (Scene 1) to the key product benefits/services (intermediate scenes) and a strong Call to Action (last scene). Keep it concise!
 `;
 
     const response = await ai.models.generateContent({
@@ -252,7 +254,7 @@ Please design the 3 scenes logically so they flow nicely from a hook (Scene 1) t
             },
             scenes: {
               type: Type.ARRAY,
-              description: "Sequential list of 3 animation scenes",
+              description: "Sequential list of animation scenes",
               items: {
                 type: Type.OBJECT,
                 properties: {

@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Sparkles,
   Smartphone,
-  Monitor
+  Monitor,
+  Instagram
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Project, Scene, VisualConfig } from "../types";
@@ -404,11 +405,15 @@ export default function VideoPlayer({
         <div className="flex items-center gap-2">
           {project.settings.aspectRatio === '9:16' ? (
             <span className="text-[10px] bg-indigo-50 border border-indigo-100/80 text-indigo-700 px-2 py-1 rounded inline-flex items-center gap-1 font-semibold uppercase tracking-wider">
-              <Smartphone className="w-3 h-3" /> TikTok & Shorts Custom Canvas
+              <Smartphone className="w-3 h-3" /> TikTok & Reels Portrait
+            </span>
+          ) : project.settings.aspectRatio === '1:1' ? (
+            <span className="text-[10px] bg-indigo-50 border border-indigo-100/80 text-indigo-700 px-2 py-1 rounded inline-flex items-center gap-1 font-semibold uppercase tracking-wider">
+              <Instagram className="w-3 h-3" /> Instagram & LinkedIn Carré
             </span>
           ) : (
             <span className="text-[10px] bg-indigo-50 border border-indigo-100/80 text-indigo-700 px-2 py-1 rounded inline-flex items-center gap-1 font-semibold uppercase tracking-wider">
-              <Monitor className="w-3 h-3" /> Landscape Campaign Canvas
+              <Monitor className="w-3 h-3" /> LinkedIn & YouTube Paysage
             </span>
           )}
         </div>
@@ -422,6 +427,8 @@ export default function VideoPlayer({
           className={`relative overflow-hidden bg-slate-950 shadow-2xl border border-slate-800 flex flex-col justify-between ${
             project.settings.aspectRatio === '9:16'
               ? 'w-[270px] h-[480px] rounded-[36px] border-[10px] border-slate-800 shadow-slate-900/40 ring-4 ring-slate-200'
+              : project.settings.aspectRatio === '1:1'
+              ? 'w-[360px] h-[360px] rounded-3xl border-[8px] border-slate-800 shadow-slate-900/35 ring-4 ring-slate-100'
               : 'w-[480px] h-[270px] rounded-2xl border-[6px] border-slate-800 shadow-slate-900/30'
           }`}
         >

@@ -141,7 +141,9 @@ export const DEFAULT_PROJECT: Project = {
     logoUrl: "", // initialized blank, customizable by user
     avatarUrl: "", // customizable with custom url
     avatarStyle: "none", // customized presenter avatar setup
-    avatarPresetName: ""
+    avatarPresetName: "",
+    platform: "tiktok",
+    slideCount: 4
   },
   scenes: [
     {
