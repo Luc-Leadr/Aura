@@ -24,11 +24,12 @@ import {
   RefreshCw
 } from "lucide-react";
 import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS, I18N_DICTS } from "../constants";
-import { ProjectSettings, AspectRatio } from "../types";
+import { Project, Scene, ProjectSettings, AspectRatio } from "../types";
 
 interface SidebarProps {
   settings: ProjectSettings;
   onUpdateSettings: (s: ProjectSettings) => void;
+  onUpdateProject?: (p: Project) => void;
   onGenerateStoryboard: (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en' }) => Promise<void>;
   isGenerating: boolean;
   language: 'fr' | 'en';
@@ -41,6 +42,7 @@ interface SidebarProps {
 export default function Sidebar({
   settings,
   onUpdateSettings,
+  onUpdateProject,
   onGenerateStoryboard,
   isGenerating,
   language,
@@ -58,6 +60,7 @@ export default function Sidebar({
   const [analysisResult, setAnalysisResult] = useState<{
     detectedTitle: string;
     suggestedSlogan: string;
+    understandingSummary: string;
     suggestedPlatform: 'tiktok' | 'instagram' | 'linkedin';
     suggestedVisualTheme: string;
     suggestedTone: string;
@@ -109,6 +112,7 @@ export default function Sidebar({
         setAnalysisResult({
           detectedTitle: data.detectedTitle || "Ma Marque",
           suggestedSlogan: data.suggestedSlogan || "",
+          understandingSummary: data.understandingSummary || "",
           suggestedPlatform: (data.suggestedPlatform === "tiktok" || data.suggestedPlatform === "instagram" || data.suggestedPlatform === "linkedin") ? data.suggestedPlatform : "instagram",
           suggestedVisualTheme: data.suggestedVisualTheme || "modern-dark",
           suggestedTone: data.suggestedTone || "energetic marketing",
@@ -125,17 +129,64 @@ export default function Sidebar({
         if (proposedPlatform === 'linkedin') targetRatio = '16:9';
         else if (proposedPlatform === 'tiktok') targetRatio = '9:16';
 
-        onUpdateSettings({
-          ...settings,
-          name: data.detectedTitle || settings.name,
-          platform: proposedPlatform,
-          aspectRatio: targetRatio,
-          visualTheme: data.suggestedVisualTheme || settings.visualTheme,
-          logoUrl: data.scrapedLogoUrl || settings.logoUrl,
-          slideCount: data.extractedTopics.length,
-          workingLanguage: workingLanguage,
-          interfaceLanguage: language
-        });
+        const suggestedThemeId = data.suggestedVisualTheme || "modern-dark";
+        const selectedThemePreset = VISUAL_THEMES.find(vt => vt.id === suggestedThemeId) || VISUAL_THEMES[0];
+
+        // Dynamically build premium draft scenes based on crawled H1 & topics before launching final AI generation
+        const proposedScenes: Scene[] = data.extractedTopics.map((topic: any, i: number) => ({
+          id: `draft-scene-${i}-${Date.now()}`,
+          duration: 5,
+          subtitle: topic.description || "Présentation de notre concept phare",
+          visual: {
+            title: topic.title || "Innovation Aura",
+            subtitle: data.detectedTitle || "Ma Marque",
+            accentWord: topic.title ? topic.title.split(' ')[0] : "Aura",
+            backgroundColor: selectedThemePreset.bgGradient,
+            backgroundType: "gradient",
+            textPosition: "center",
+            textStyle: "bordered",
+            animationType: "drift",
+            assetKeywords: topic.title || "abstract minimalist",
+            fontFamily: selectedThemePreset.font || "inter",
+            customAccentColor: ""
+          },
+          audio: {
+            voiceName: "Zephyr",
+            speechSpeed: 1,
+            backgroundMusicVibe: "lofi",
+            volume: 0.8
+          },
+          transition: "fade"
+        }));
+
+        if (onUpdateProject) {
+          onUpdateProject({
+            settings: {
+              ...settings,
+              name: data.detectedTitle || settings.name,
+              platform: proposedPlatform,
+              aspectRatio: targetRatio,
+              visualTheme: suggestedThemeId,
+              logoUrl: data.scrapedLogoUrl || settings.logoUrl,
+              slideCount: data.extractedTopics.length,
+              workingLanguage: workingLanguage,
+              interfaceLanguage: language
+            },
+            scenes: proposedScenes
+          });
+        } else {
+          onUpdateSettings({
+            ...settings,
+            name: data.detectedTitle || settings.name,
+            platform: proposedPlatform,
+            aspectRatio: targetRatio,
+            visualTheme: suggestedThemeId,
+            logoUrl: data.scrapedLogoUrl || settings.logoUrl,
+            slideCount: data.extractedTopics.length,
+            workingLanguage: workingLanguage,
+            interfaceLanguage: language
+          });
+        }
 
         setScriptVibe(data.suggestedTone || "energetic marketing");
         
@@ -523,6 +574,42 @@ export default function Sidebar({
               {/* DESCRIPT-LIKE EXPLICIT VALIDATION CHANNELS / SEQUENCE VERIFICATION STEP */}
               {analysisResult && (
                 <div className="bg-slate-50/40 p-3 border border-slate-200 rounded-xl space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  
+                  {/* AI Brand Comprehension Summary Box */}
+                  {analysisResult.understandingSummary && (
+                    <div className="bg-indigo-50/60 border border-indigo-150 p-3 rounded-xl space-y-2">
+                      <div className="flex items-center gap-1.5 text-indigo-850">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-wider font-sans">
+                          {language === 'fr' ? "SYNTHÈSE DE COMPRÉHENSION IA" : "AI COMPREHENSION WRAPUP"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed font-semibold text-indigo-950">
+                        {analysisResult.understandingSummary}
+                      </p>
+                      
+                      {/* Grid of chosen charters */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-indigo-100 text-[10px]">
+                        <div className="flex flex-col">
+                          <span className="text-indigo-500 text-[8px] font-extrabold uppercase font-mono tracking-tight">
+                            {language === 'fr' ? "Charte Graphique Auto" : "Auto Visual Palette"}
+                          </span>
+                          <span className="font-extrabold text-indigo-900 truncate">
+                            🎨 {VISUAL_THEMES.find(vt => vt.id === analysisResult.suggestedVisualTheme)?.name || analysisResult.suggestedVisualTheme}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-indigo-500 text-[8px] font-extrabold uppercase font-mono tracking-tight">
+                            {language === 'fr' ? "Cadrage & Ton" : "Framing & Tone"}
+                          </span>
+                          <span className="font-extrabold text-indigo-900 truncate capitalize">
+                            📣 {analysisResult.suggestedPlatform} • {analysisResult.suggestedTone.replace('marketing', '').replace('explainer', '').replace('story', '')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center border-b border-slate-205 pb-1.5">
                     <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-tight">
                       {t.checked_topics_title}

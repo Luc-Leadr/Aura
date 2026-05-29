@@ -531,77 +531,140 @@ export default function VideoPlayer({
 
                 {/* Presenter Avatars Overlays */}
                 {project.settings.avatarStyle === 'floating' && project.settings.avatarUrl && (
-                  <div className="absolute bottom-16 right-4 z-20 flex flex-col items-center">
-                    <div className="relative">
-                      {isPlaying && (
+                  <div className="absolute bottom-16 right-5 z-20 flex items-end gap-3 max-w-[85%] animate-in slide-in-from-right-3 duration-350">
+                    {/* Glowing speech bubble of the AI Host */}
+                    {isPlaying && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="bg-black/85 backdrop-blur-md text-white text-[9px] font-semibold py-1.5 px-3 rounded-2xl rounded-tr-none border border-indigo-550/35 max-w-[150px] leading-snug shadow-2xl text-left"
+                      >
+                        <p className="line-clamp-2 italic">
+                          &ldquo;{currentScene?.subtitle.split(' ').slice(0, 8).join(' ') || "..."}...&rdquo;
+                        </p>
+                        <span className="text-[6.5px] uppercase font-bold text-indigo-400 mt-1 block tracking-wider">
+                          {language === 'fr' ? '• Parole Active' : '• Active Speech'}
+                        </span>
+                      </motion.div>
+                    )}
+                    
+                    <div className="flex flex-col items-center">
+                      <div className="relative">
                         <motion.div 
-                          className="absolute -inset-1.5 rounded-full bg-indigo-500/30 filter blur-[1px]"
-                          animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.8, 0.4] }}
-                          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute -inset-1 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"
+                          animate={isPlaying ? { rotate: 360, scale: [1, 1.1, 1] } : {}}
+                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                         />
-                      )}
-                      <img 
-                        src={project.settings.avatarUrl} 
-                        alt="Presenter" 
-                        className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-lg relative"
-                      />
+                        <img 
+                          src={project.settings.avatarUrl} 
+                          alt="Presenter" 
+                          className="w-12 h-12 rounded-full object-cover border-2 border-slate-950 shadow-2xl relative"
+                        />
+                        {/* Tiny active pulse indicator */}
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-slate-950"></span>
+                        </span>
+                      </div>
+                      <span className="text-[7.5px] bg-slate-950 text-white font-extrabold py-0.5 px-2 rounded-full mt-1.5 border border-white/10 uppercase tracking-widest shadow-lg leading-none">
+                        {project.settings.avatarPresetName || "Présentateur"}
+                      </span>
                     </div>
-                    <span className="text-[7.5px] bg-black/60 text-white font-bold py-0.5 px-1.5 rounded-full mt-1 border border-white/10 uppercase tracking-wide">
-                      {project.settings.avatarPresetName || "Présentateur"}
-                    </span>
                   </div>
                 )}
 
                 {project.settings.avatarStyle === 'split-screen' && project.settings.avatarUrl && (
-                  <div className="w-full mt-3 flex justify-center z-10 animate-in fade-in-50 duration-350">
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 w-full max-w-[170px]">
+                  <div className="absolute bottom-16 left-4 right-4 z-20 flex justify-center animate-in slide-in-from-bottom-2 duration-350">
+                    <div className="flex items-center gap-3 bg-slate-950/80 backdrop-blur-md p-2 rounded-2xl border border-white/15 w-full max-w-[240px] shadow-2xl">
                       <div className="relative flex-shrink-0">
-                        {isPlaying && (
-                          <motion.div 
-                            className="absolute inset-0 rounded-full bg-indigo-500/45 scale-120 filter blur-[1px]"
-                            animate={{ scale: [1, 1.3, 1] }}
-                            transition={{ duration: 0.9, repeat: Infinity }}
-                          />
-                        )}
+                        <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-emerald-400 to-indigo-500 blur-xs" />
                         <img 
                           src={project.settings.avatarUrl} 
                           alt="Presenter" 
-                          className="w-7 h-7 rounded-full object-cover border border-white/20"
+                          className="w-9 h-9 rounded-full object-cover border-2 border-slate-900 relative"
                         />
+                        {/* Real dynamic speaking dots indicator */}
+                        {isPlaying && (
+                          <div className="absolute bottom-0 right-0 flex gap-0.5 bg-slate-900 border border-white/20 rounded-full px-1 py-0.5 scale-90">
+                            <span className="w-0.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                            <span className="w-0.5 h-2.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                            <span className="w-0.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.5s' }} />
+                          </div>
+                        )}
                       </div>
-                      <div className="text-left overflow-hidden">
-                        <p className="text-[8px] font-bold text-white truncate leading-tight">
-                          {project.settings.avatarPresetName || "Présentateur"}
+                      <div className="text-left overflow-hidden flex-1">
+                        <p className="text-[10px] font-black text-white truncate uppercase tracking-wider">
+                          {project.settings.avatarPresetName || "Emma"}
                         </p>
-                        <p className="text-[6.5px] text-indigo-300 font-semibold uppercase tracking-wider leading-none mt-0.5 animate-pulse">
-                          • parole-active
+                        <p className="text-[7.5px] text-zinc-400 font-bold tracking-tight">
+                          {language === 'fr' ? '🔑 Ambassadeur de marque' : '🔑 Brand spokesperson'}
                         </p>
+                        {isPlaying && (
+                          <span className="text-[6.5px] font-mono text-emerald-400 block font-black uppercase tracking-widest mt-0.5 animate-pulse">
+                            • {language === 'fr' ? 'NARRATION ACTIVE' : 'NARRATION ACTIVE'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
                 {project.settings.avatarStyle === 'podcast-bubble' && project.settings.avatarUrl && (
-                  <div className="absolute top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-15 flex flex-col items-center justify-center animate-in scale-in duration-300">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-15 flex flex-col items-center justify-center animate-in scale-in duration-300 pointer-events-none">
                     <div className="relative">
-                      {[...Array(isPlaying ? 3 : 0)].map((_, i) => (
+                      {/* Bouncing radar rings of speaking energy */}
+                      {[...Array(isPlaying ? 3 : 1)].map((_, i) => (
                         <motion.div
                           key={i}
-                          className="absolute inset-0 rounded-full border border-indigo-400/50"
-                          initial={{ scale: 1, opacity: 0.8 }}
-                          animate={{ scale: 2, opacity: 0 }}
-                          transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.6 }}
+                          className="absolute -inset-4 rounded-full border border-indigo-400/40"
+                          initial={{ scale: 0.9, opacity: 0.7 }}
+                          animate={isPlaying ? { scale: 1.8, opacity: 0 } : {}}
+                          transition={{ duration: 2, repeat: Infinity, delay: i * 0.65, ease: "easeOut" }}
                         />
                       ))}
-                      <img
-                        src={project.settings.avatarUrl}
-                        alt="Host"
-                        className="w-14 h-14 rounded-full object-cover border-4 border-white/25 shadow-2xl relative"
-                      />
+                      
+                      {/* Stylized circular image container with colored border shadow */}
+                      <div className="relative">
+                        <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 blur-sm animate-pulse" />
+                        <img
+                          src={project.settings.avatarUrl}
+                          alt="Host"
+                          className="w-16 h-16 rounded-full object-cover border-4 border-slate-950 shadow-2xl relative"
+                        />
+                      </div>
+                      
+                      {/* Interactive microphone badge on avatar */}
+                      <span className="absolute -bottom-1 -right-1 bg-indigo-650 text-white p-1 rounded-full border border-slate-950 shadow">
+                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-ping absolute inset-0 m-auto" />
+                        <svg className="w-3 h-3 text-red-400 fill-current" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10" />
+                        </svg>
+                      </span>
                     </div>
-                    <span className="text-[8px] font-mono font-extrabold text-[#fcd34d] tracking-widest uppercase mt-2 filter drop-shadow">
-                      🎙️ {project.settings.avatarPresetName || "Hôte"}
-                    </span>
+
+                    <div className="mt-3.5 bg-slate-950/90 backdrop-blur-md px-3.5 py-1 rounded-xl border border-white/10 shadow-lg text-center">
+                      <span className="text-[10px] font-black text-amber-400 tracking-wider uppercase block">
+                        🎙️ {project.settings.avatarPresetName || "Hôte"}
+                      </span>
+                      <span className="text-[7px] text-zinc-400 font-bold uppercase tracking-widest block mt-0.5 font-mono">
+                        {language === 'fr' ? 'NARRATEUR CHALEUREUX' : 'ORGANIC SPEAKER'}
+                      </span>
+                    </div>
+
+                    {/* Left/Right floating stereo audio waves bouncing in real time while playing */}
+                    {isPlaying && (
+                      <div className="absolute -bottom-6 flex items-center justify-center gap-1.5">
+                        {[...Array(6)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="w-1 bg-gradient-to-t from-indigo-500 to-amber-400 rounded-full"
+                            animate={{ height: [8, 22, 8] }}
+                            transition={{ duration: 0.4 + i * 0.08, repeat: Infinity, ease: "easeInOut" }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

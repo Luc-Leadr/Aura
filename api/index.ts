@@ -99,6 +99,24 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
     // 1. Extract Title
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim() : '';
+
+    // Extract H1 Headings
+    const h1s: string[] = [];
+    const h1Regex = /<h1[^>]*>([\s\S]*?)<\/h1>/gi;
+    let h1Match;
+    while ((h1Match = h1Regex.exec(html)) !== null && h1s.length < 5) {
+      const text = h1Match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      if (text.length > 3) h1s.push(text);
+    }
+
+    // Extract H2 Headings
+    const h2s: string[] = [];
+    const h2Regex = /<h2[^>]*>([\s\S]*?)<\/h2>/gi;
+    let h2Match;
+    while ((h2Match = h2Regex.exec(html)) !== null && h2s.length < 8) {
+      const text = h2Match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      if (text.length > 3) h2s.push(text);
+    }
     
     // 2. Extract Key Paragraphs (constrained count to minimize context token bloating and speed up model)
     const paragraphs: string[] = [];
@@ -116,7 +134,7 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
       }
     }
     
-    const contextText = `Title: ${title}\nContent:\n${paragraphs.slice(0, 4).join('\n').substring(0, 600)}`;
+    const contextText = `Title: ${title}\nPrimary Headings (H1): ${h1s.join(' | ')}\nSecondary Headings (H2): ${h2s.join(' | ')}\nParagraphs:\n${paragraphs.slice(0, 4).join('\n').substring(0, 600)}`;
     
     // 3. Extract Logo from same HTML buffer
     let logoUrl = "";
@@ -256,6 +274,7 @@ URL domain or brand: "${url}"
           properties: {
             detectedTitle: { type: Type.STRING, description: "Highly polished title of the brand or web page" },
             suggestedSlogan: { type: Type.STRING, description: "A punchy promotional slogan or hook" },
+            understandingSummary: { type: Type.STRING, description: "A professional and elegant summary in French (1 or 2 sentences max) showing a clear understanding of the website's brand identity, audience, and key value propositions." },
             suggestedPlatform: { type: Type.STRING, description: "Ideal platform category: 'tiktok', 'instagram', or 'linkedin'" },
             suggestedVisualTheme: { type: Type.STRING, description: "Matches: 'modern-dark', 'neon-pulse', 'warm-editorial', 'clean-corporate', or 'brutalist-yellow'" },
             suggestedTone: { type: Type.STRING, description: "Matches: 'energetic marketing', 'educational explainer', or 'inspiring brand story'" },
@@ -274,7 +293,7 @@ URL domain or brand: "${url}"
               }
             }
           },
-          required: ["detectedTitle", "suggestedSlogan", "suggestedPlatform", "suggestedVisualTheme", "suggestedTone", "extractedTopics"]
+          required: ["detectedTitle", "suggestedSlogan", "understandingSummary", "suggestedPlatform", "suggestedVisualTheme", "suggestedTone", "extractedTopics"]
         }
       }
     });

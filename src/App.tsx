@@ -60,6 +60,13 @@ export default function App() {
     }));
   };
 
+  const handleUpdateProject = (newProject: Project) => {
+    setProject(newProject);
+    setHasGenerated(true);
+    setActiveSceneIndex(0);
+    setCurrentTime(0);
+  };
+
   const handleUpdateScenes = (newScenes: Scene[]) => {
     setProject(prev => ({
       ...prev,
@@ -366,6 +373,7 @@ export default function App() {
         <Sidebar
           settings={project.settings}
           onUpdateSettings={handleUpdateSettings}
+          onUpdateProject={handleUpdateProject}
           onGenerateStoryboard={handleGenerateStoryboard}
           isGenerating={isGenerating}
           language={language}
