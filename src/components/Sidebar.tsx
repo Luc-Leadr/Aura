@@ -23,21 +23,31 @@ import {
   Trash2,
   RefreshCw
 } from "lucide-react";
-import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS } from "../constants";
+import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS, I18N_DICTS } from "../constants";
 import { ProjectSettings, AspectRatio } from "../types";
 
 interface SidebarProps {
   settings: ProjectSettings;
   onUpdateSettings: (s: ProjectSettings) => void;
-  onGenerateStoryboard: (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number }) => Promise<void>;
+  onGenerateStoryboard: (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en' }) => Promise<void>;
   isGenerating: boolean;
+  language: 'fr' | 'en';
+  setLanguage: (lang: 'fr' | 'en') => void;
+  workingLanguage: 'fr' | 'en';
+  setWorkingLanguage: (lang: 'fr' | 'en') => void;
+  onLoadPresetDemo: () => void;
 }
 
 export default function Sidebar({
   settings,
   onUpdateSettings,
   onGenerateStoryboard,
-  isGenerating
+  isGenerating,
+  language,
+  setLanguage,
+  workingLanguage,
+  setWorkingLanguage,
+  onLoadPresetDemo
 }: SidebarProps) {
   const [prompt, setPrompt] = useState("");
   const [url, setUrl] = useState("");
@@ -49,7 +59,7 @@ export default function Sidebar({
     detectedTitle: string;
     suggestedSlogan: string;
     suggestedPlatform: 'tiktok' | 'instagram' | 'linkedin';
-    suggestedVisualTheme: 'modern-dark' | 'neon-pulse' | 'warm-editorial' | 'clean-corporate' | 'brutalist-yellow';
+    suggestedVisualTheme: string;
     suggestedTone: string;
     scrapedLogoUrl: string;
     extractedTopics: Array<{ id: string; title: string; description: string; selected: boolean }>;
@@ -62,13 +72,16 @@ export default function Sidebar({
   const [showUrlLogoInput, setShowUrlLogoInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Default parameters if undefined (protective layer)
+  // Translation helpers
+  const t = I18N_DICTS[language];
+
+  // Default parameters if undefined
   const activePlatform = settings.platform || 'tiktok';
   const activeSlideCount = settings.slideCount || 4;
 
   const handleAnalyzeWebsite = async () => {
     if (!url || url.trim().length < 3) {
-      setAnalysisError("Veuillez saisir une adresse URL valide.");
+      setAnalysisError(language === 'fr' ? "Veuillez saisir une adresse URL valide." : "Please enter a valid URL address.");
       return;
     }
     setIsAnalyzing(true);
@@ -77,10 +90,12 @@ export default function Sidebar({
       const response = await fetch("/api/analyze-website", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() })
+        body: JSON.stringify({ url: url.trim(), language: workingLanguage })
       });
       if (!response.ok) {
-        let errorMsg = "L'analyse du site a échoué. Vérifiez que l'URL est correcte et accessible.";
+        let errorMsg = language === 'fr' 
+          ? "L'analyse du site a échoué. Vérifiez que l'URL est correcte et accessible."
+          : "Analyzing webpage failed. Verify URL is correct and reachable.";
         try {
           const errData = await response.json();
           if (errData && errData.error) {
@@ -117,20 +132,22 @@ export default function Sidebar({
           aspectRatio: targetRatio,
           visualTheme: data.suggestedVisualTheme || settings.visualTheme,
           logoUrl: data.scrapedLogoUrl || settings.logoUrl,
-          slideCount: data.extractedTopics.length
+          slideCount: data.extractedTopics.length,
+          workingLanguage: workingLanguage,
+          interfaceLanguage: language
         });
 
         setScriptVibe(data.suggestedTone || "energetic marketing");
         
-        // Build clear description prompt
+        // Build clear description prompt based on working language preferred
         const bulletPoints = data.extractedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
         setPrompt(`Slogan: ${data.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
       } else {
-        throw new Error("Aucun sujet exploitable n'a été extrait du site.");
+        throw new Error(language === 'fr' ? "Aucun sujet exploitable n'a été extrait." : "No usable topics extracted from the webpage.");
       }
     } catch (err: any) {
       console.error(err);
-      setAnalysisError(err.message || "Impossible de contacter l'agent d'analyse du site web.");
+      setAnalysisError(err.message || "Error analyzing website.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -152,9 +169,25 @@ export default function Sidebar({
     const checkedTopics = updatedTopics.filter(t => t.selected);
     onUpdateSettings({
       ...settings,
-      slideCount: Math.max(3, checkedTopics.length)
+      slideCount: Math.max(1, checkedTopics.length)
     });
 
+    const bulletPoints = checkedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
+    setPrompt(`Slogan: ${analysisResult.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
+  };
+
+  const toggleAllTopics = (select: boolean) => {
+    if (!analysisResult) return;
+    const updatedTopics = analysisResult.extractedTopics.map(t => ({ ...t, selected: select }));
+    setAnalysisResult({
+      ...analysisResult,
+      extractedTopics: updatedTopics
+    });
+    const checkedTopics = updatedTopics.filter(t => t.selected);
+    onUpdateSettings({
+      ...settings,
+      slideCount: Math.max(1, checkedTopics.length)
+    });
     const bulletPoints = checkedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
     setPrompt(`Slogan: ${analysisResult.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
   };
@@ -165,7 +198,8 @@ export default function Sidebar({
       prompt, 
       url, 
       scriptVibe,
-      slideCount: activeSlideCount
+      slideCount: activeSlideCount,
+      workingLanguage
     });
   };
 
@@ -192,7 +226,6 @@ export default function Sidebar({
     });
   };
 
-  // Local Logo file loader handler
   const handleLogoFile = (file: File) => {
     if (file && (file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/jpg")) {
       const reader = new FileReader();
@@ -232,381 +265,355 @@ export default function Sidebar({
   };
 
   const suggestIdea = () => {
-    setUrl("https://www.mon-atelier-artisan.fr");
-    setPrompt("Présenter notre service d'ebenisterie locale responsable. 3 points clés à souligner : bois de forêts certifiées locales, restauration artisanale haut de gamme, et livraison bas-carbone sur-mesure.");
-    setScriptVibe("inspiring brand story");
-    onUpdateSettings({
-      ...settings,
-      platform: "instagram",
-      aspectRatio: "1:1",
-      slideCount: 4,
-      visualTheme: "warm-editorial"
-    });
+    if (language === 'fr') {
+      setUrl("https://www.le-grub.com");
+      setPrompt("Présenter l'ADN créatif du co-coding Culinaire Le Grub. Mettre en valeur l'espace atelier partagé par des chefs labellisés, les plaques de cuisson partagées et de délicieux plats du terroir.");
+      setScriptVibe("inspiring brand story");
+      onUpdateSettings({
+        ...settings,
+        platform: "instagram",
+        aspectRatio: "1:1",
+        slideCount: 4,
+        visualTheme: "sandstone-luxury"
+      });
+    } else {
+      setUrl("https://www.le-grub.com");
+      setPrompt("Highlight the creative DNA of Le Grub Culinary Workspace. Showcase the shared designer atelier kitchen utilized by culinary artisans and certified terroir organic plates.");
+      setScriptVibe("inspiring brand story");
+      onUpdateSettings({
+        ...settings,
+        platform: "instagram",
+        aspectRatio: "1:1",
+        slideCount: 4,
+        visualTheme: "sandstone-luxury"
+      });
+    }
   };
 
-  // Dynamic advisor intelligence according to client input
-  const getAiOpinion = () => {
-    if (!url.trim() && !prompt.trim()) {
-      return {
-        title: "🤖 Assistant Aura : Bienvenue !",
-        text: "Sélectionnez votre plateforme cible (TikTok, Instagram ou LinkedIn), puis entrez l'adresse de votre site web pour concevoir vos diapositives.",
-        color: "bg-indigo-50 border-indigo-200 text-indigo-950",
-        icoClass: "text-indigo-600 bg-indigo-100"
-      };
-    }
-    
-    if (url.trim() && !prompt.trim()) {
-      return {
-        title: "🔎 Site Web Synchronisé !",
-        text: "Génial ! L'IA va lire son contenu en direct. Ajoutez une courte consigne d'écriture dans le champ d'en-dessous pour cibler vos attentes.",
-        color: "bg-emerald-50 border-emerald-250 text-emerald-950",
-        icoClass: "text-emerald-700 bg-emerald-100"
-      };
-    }
-    
-    if (!url.trim() && prompt.trim()) {
-      return {
-        title: "💡 Astuce Charte Graphique",
-        text: "Votre texte est prêt. Saviez-vous qu'en ajoutant l'URL de votre site internet, notre moteur de scraping peut en extraire automatiquement la palette de couleurs et le logo ?",
-        color: "bg-amber-50 border-amber-250 text-amber-950",
-        icoClass: "text-amber-700 bg-amber-100/80"
-      };
-    }
-
-    // Both url and prompt exist
-    if (activePlatform === 'linkedin') {
-      return {
-        title: "💼 Recommandation d'expert (LinkedIn)",
-        text: "Pour maximiser la conversion sur LinkedIn, préférez le format Paysage (16:9) ou Carré (1:1), et utilisez un ton d'écriture 'Éducateur & Pédagogique' !",
-        color: "bg-blue-50 border-blue-200 text-blue-950",
-        icoClass: "text-blue-700 bg-blue-100"
-      };
-    }
-
-    if (activePlatform === 'tiktok') {
-      return {
-        title: "⚡ Recommandation d'expert (TikTok)",
-        text: "Sur TikTok, l'attention se gagne en 2 secondes ! Raccourcissez à 15 secondes max (3-4 slides) et adoptez un ton 'Vendeur & Énergique'.",
-        color: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-950",
-        icoClass: "text-fuchsia-700 bg-fuchsia-100"
-      };
-    }
-
-    return {
-      title: "📸 Recommandation d'expert (Instagram)",
-      text: "Le format Carré (1:1) s'insère à la perfection dans les flux de marque Instagram. Utilisez un ton 'Inspirant' combiné avec des thèmes colorés chauds.",
-      color: "bg-purple-50 border-purple-200 text-purple-950",
-      icoClass: "text-purple-700 bg-purple-100"
-    };
-  };
-
-  const aiOpinion = getAiOpinion();
-
-  const loadExample = (ex: typeof SAMPLE_SOURCE_EXAMPLES[0]) => {
+  const loadExample = (ex: any) => {
     setUrl(ex.url);
     setPrompt(ex.prompt);
-    setScriptVibe(ex.vibe);
+    setScriptVibe(ex.vibe === "Inspiring & Ecological" ? "inspiring brand story" : "energetic marketing");
     onUpdateSettings({
       ...settings,
-      visualTheme: ex.theme as any,
-      slideCount: 4,
-      platform: "instagram",
-      aspectRatio: "1:1"
+      visualTheme: ex.theme,
+      platform: ex.theme === "neon-pulse" ? "tiktok" : "instagram",
+      aspectRatio: ex.theme === "neon-pulse" ? "9:16" : "1:1"
     });
+    setActiveTab('create');
   };
 
   return (
-    <aside id="aura-sidebar" className="w-[380px] bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden select-none">
-      {/* Brand Header */}
-      <div className="p-5 border-b border-slate-200 flex items-center gap-3 bg-slate-50/50">
-        <div id="sidebar-logo" className="w-9 h-9 rounded bg-indigo-600 flex items-center justify-center shadow-sm">
-          <Video className="w-5 h-5 text-white" />
+    <aside id="aura-sidebar" className="w-[380px] bg-white border-r border-slate-200 flex flex-col overflow-hidden h-full">
+      {/* Upper Brand panel & Language Pickers */}
+      <div className="p-4 border-b border-slate-100 bg-slate-50/70 select-none flex flex-col gap-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="p-1 bg-indigo-650 rounded-lg text-white">
+                <Video className="w-5 h-5" />
+              </span>
+              <h1 className="text-sm font-black font-sans tracking-tight text-slate-800 uppercase">
+                AURA MOTION
+              </h1>
+            </div>
+            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">
+              {t.tagline}
+            </p>
+          </div>
+          <span className="text-[10px] bg-emerald-50 text-emerald-700 font-mono font-bold px-2.5 py-0.5 rounded border border-emerald-200">
+            {t.creative_mode}
+          </span>
         </div>
-        <div>
-          <h1 className="text-base font-bold tracking-tight text-slate-800 flex items-center gap-1.5">
-            Aura Motion
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100">
-              v2.5
+
+        {/* Dynamic Dual Language Switcher controls */}
+        <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-[11px] space-y-2">
+          {/* Interface Lang */}
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-500 flex items-center gap-1">
+              <Languages className="w-3.5 h-3.5 text-indigo-500" /> Language UI
             </span>
-          </h1>
-          <p className="text-[11px] text-slate-500 font-medium">générateur de vidéo publicitaire intelligente</p>
+            <div className="flex gap-1">
+              <button 
+                type="button"
+                onClick={() => setLanguage('fr')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${language === 'fr' ? 'bg-indigo-600 text-white' : 'bg-slate-100 hover:bg-slate-205 text-slate-600'}`}
+              >
+                FR 🇫🇷
+              </button>
+              <button 
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${language === 'en' ? 'bg-indigo-600 text-white' : 'bg-slate-100 hover:bg-slate-205 text-slate-600'}`}
+              >
+                EN 🇬🇧
+              </button>
+            </div>
+          </div>
+
+          {/* Working Script generation Lang */}
+          <div className="flex justify-between items-center border-t border-slate-100 pt-1.5">
+            <span className="font-semibold text-slate-500 flex items-center gap-1">
+              <Globe className="w-3.5 h-3.5 text-emerald-500" /> Langue de Travail (Script IA)
+            </span>
+            <div className="flex gap-1">
+              <button 
+                type="button"
+                onClick={() => setWorkingLanguage('fr')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${workingLanguage === 'fr' ? 'bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-205 text-slate-600'}`}
+              >
+                FR 🥖
+              </button>
+              <button 
+                type="button"
+                onClick={() => setWorkingLanguage('en')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${workingLanguage === 'en' ? 'bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-205 text-slate-600'}`}
+              >
+                EN 🗽
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tabs list */}
-      <div className="flex border-b border-slate-200 text-xs px-4 bg-slate-50">
+      {/* Tabs list Bar */}
+      <div className="flex border-b border-slate-100 select-none text-xs">
         <button
-          id="tab-create"
+          id="btn-tab-create"
           onClick={() => setActiveTab('create')}
-          className={`flex-1 py-3 text-center font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'create' 
-              ? 'text-indigo-600 border-indigo-600' 
-              : 'text-slate-500 border-transparent hover:text-slate-800'
+          className={`flex-1 py-3 text-center font-bold tracking-tight border-b-2 flex items-center justify-center gap-1.5 ${
+            activeTab === 'create'
+              ? 'border-indigo-600 text-indigo-705'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Création
+          <Sparkles className="w-3.5 h-3.5" />
+          {t.tab_create}
         </button>
         <button
-          id="tab-examples"
+          id="btn-tab-examples"
           onClick={() => setActiveTab('examples')}
-          className={`flex-1 py-3 text-center font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'examples' 
-              ? 'text-indigo-600 border-indigo-600' 
-              : 'text-slate-500 border-transparent hover:text-slate-800'
+          className={`flex-1 py-3 text-center font-bold tracking-tight border-b-2 flex items-center justify-center gap-1.5 ${
+            activeTab === 'examples'
+              ? 'border-indigo-600 text-indigo-705'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Campagnes Prêtes
+          <FileText className="w-3.5 h-3.5" />
+          {t.tab_ready}
         </button>
         <button
-          id="tab-settings"
+          id="btn-tab-settings"
           onClick={() => setActiveTab('settings')}
-          className={`flex-1 py-3 text-center font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'settings' 
-              ? 'text-indigo-600 border-indigo-600' 
-              : 'text-slate-500 border-transparent hover:text-slate-800'
+          className={`flex-1 py-3 text-center font-bold tracking-tight border-b-2 flex items-center justify-center gap-1.5 ${
+            activeTab === 'settings'
+              ? 'border-indigo-600 text-indigo-705'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Rapport & Canvas
+          <Sliders className="w-3.5 h-3.5" />
+          {t.tab_report}
         </button>
       </div>
 
-      {/* Dynamic Area */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin scrollbar-thumb-slate-200">
-        
+      {/* Primary content area */}
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
         {activeTab === 'create' && (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form id="aura-creative-form" onSubmit={handleSubmit} className="space-y-4">
             
-            {/* 🤖 Dynamic AI Optimization Assistant */}
-            <div id="ai-advisor-panel" className={`p-4 rounded-xl border transition-all duration-300 shadow-xs flex gap-3 ${aiOpinion.color}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm font-bold animate-pulse ${aiOpinion.icoClass}`}>
-                🤖
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-[11px] font-extrabold uppercase tracking-wider">{aiOpinion.title}</h4>
-                <p className="text-[11px] leading-relaxed font-medium">{aiOpinion.text}</p>
-                
-                {!url.trim() && !prompt.trim() && (
-                  <button
-                    id="btn-suggest-idea"
-                    type="button"
-                    onClick={suggestIdea}
-                    className="mt-1.5 inline-flex items-center gap-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded-md transition shadow-xs cursor-pointer"
-                  >
-                    💡 Proposer un exemple crafté
-                  </button>
-                )}
-              </div>
+            {/* Quick onboard hints or custom suggestion widget */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70 space-y-1">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                {t.advisor_welcome_title}
+              </h3>
+              <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                {t.advisor_welcome_desc}
+              </p>
+              <button
+                type="button"
+                onClick={suggestIdea}
+                className="text-[10px] text-indigo-600 hover:underline font-bold flex items-center gap-1 mt-1 cursor-pointer"
+              >
+                {t.suggest_example_btn}
+              </button>
             </div>
 
-            {/* 🌟 Étape 1 : Choix de la plateforme au démarrage */}
-            <div className="space-y-2 border-t border-slate-100 pt-3">
-              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                📌 1. Choisir la Plateforme de Diffusion
+            {/* Platform & format selector row */}
+            <div className="space-y-1.5 bg-slate-50/50 p-2 rounded-xl border border-slate-100">
+              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                {t.step_platform}
               </label>
-              
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { id: 'tiktok', label: 'TikTok Reels', icon: Smartphone, desc: '9:16 Vertical', color: 'hover:border-rose-300' },
-                  { id: 'instagram', label: 'Instagram', icon: Instagram, desc: '1:1 Carré', color: 'hover:border-purple-300' },
-                  { id: 'linkedin', label: 'LinkedIn B2B', icon: Monitor, desc: '16:9 Paysage', color: 'hover:border-blue-300' }
-                ].map((p) => {
-                  const active = activePlatform === p.id;
-                  const Icon = p.icon;
+                  { id: 'tiktok', label: 'TikTok/Reels', ratio: '9:16' },
+                  { id: 'instagram', label: 'Insta Grid', ratio: '1:1' },
+                  { id: 'linkedin', label: 'LinkedIn', ratio: '16:9' }
+                ].map((item) => {
+                  const isActive = activePlatform === item.id;
                   return (
                     <button
-                      id={`platform-btn-${p.id}`}
-                      key={p.id}
+                      id={`platform-choice-${item.id}`}
+                      key={item.id}
                       type="button"
-                      onClick={() => handleSelectPlatform(p.id as any)}
-                      className={`p-2.5 rounded-xl border text-center flex flex-col items-center justify-center transition cursor-pointer relative ${p.color} ${
-                        active
-                          ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-500/10'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      onClick={() => handleSelectPlatform(item.id as any)}
+                      className={`py-2 px-1 rounded-lg border flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                        isActive
+                          ? 'bg-indigo-600 border-indigo-650 text-white font-bold scale-[1.01] shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 mb-1 ${active ? 'text-indigo-600' : 'text-slate-500'}`} />
-                      <span className="text-[10px] font-extrabold block text-slate-800 leading-none">{p.label}</span>
-                      <span className="text-[8px] text-slate-400 mt-0.5 block leading-none">{p.desc}</span>
-                      {active && (
-                        <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                      )}
+                      <span className="text-[10px] font-bold">{item.label}</span>
+                      <span className="text-[8px] opacity-75 font-mono font-medium">{item.ratio}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 📊 Étape 1.5: Choisir de combien de services on souhaite parler */}
-            <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-              <div className="flex justify-between items-center text-[11px]">
-                <label className="font-extrabold text-slate-500 uppercase tracking-wider">
-                  🔢 Nombre de services (Slides)
-                </label>
-                <span className="bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full text-[10px]">
-                  {activeSlideCount} Slides
-                </span>
-              </div>
-              <input
-                id="input-slide-count-slider"
-                type="range"
-                min="3"
-                max="6"
-                step="1"
-                value={activeSlideCount}
-                onChange={(e) => onUpdateSettings({ ...settings, slideCount: Number(e.target.value) })}
-                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-              />
-              <div className="flex justify-between text-[8px] text-slate-400 font-bold px-1 uppercase tracking-tight">
-                <span>3 (Rapide)</span>
-                <span>4 (Recommandé)</span>
-                <span>5</span>
-                <span>6 (Exhaustif)</span>
-              </div>
-              <p className="text-[9px] text-slate-500 leading-tight">
-                Chaque service ou argument clé de votre site correspondra à une diapositive dédiée de <strong>{Math.max(3, Math.floor(18 / activeSlideCount))}s</strong> pour une vidéo percutante.
-              </p>
-            </div>
-
-            {/* 🌐 Étape 1 : Import & Analyse du Site Internet */}
-            <div className="space-y-2 border-t border-slate-150 pt-3">
-              <label className="text-[11px] font-extrabold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5" /> 1. Analyser un Site Web (Fortement Recommandé)
+            {/* Step 1: Analyze Website & Extract Core Sequences (The Descript feature) */}
+            <div id="step-analyze-container" className="space-y-2 border-t border-slate-100 pt-3">
+              <label className="text-[11px] font-extrabold text-slate-450 uppercase tracking-wider block">
+                {t.step_analyze}
               </label>
-              
               <div className="flex gap-2">
                 <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-slate-400">
+                    <Link2 className="w-3.5 h-3.5" />
+                  </span>
                   <input
-                    id="input-url"
+                    id="input-website-url"
                     type="text"
-                    placeholder="ex: ma-marque-responsable.fr"
+                    placeholder={t.input_url_placeholder}
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="w-full bg-white border border-slate-205 text-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-xs font-semibold"
+                    className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-2 pl-8 pr-3 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none shadow-sm font-medium"
                   />
-                  <Link2 className="absolute left-3 top-3 w-3.5 h-3.5 text-slate-400" />
                 </div>
-                
                 <button
+                  id="btn-analyze-website"
                   type="button"
                   onClick={handleAnalyzeWebsite}
-                  disabled={isAnalyzing || isGenerating || !url.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-extrabold px-3.5 rounded-xl text-xs transition shadow-sm cursor-pointer flex items-center gap-1.5 shrink-0"
+                  disabled={isAnalyzing}
+                  className="px-3 bg-slate-800 hover:bg-slate-905 text-white text-xs font-bold rounded-lg hover:shadow-xs transition flex items-center gap-1 cursor-pointer flex-shrink-0 disabled:opacity-50"
                 >
                   {isAnalyzing ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
+                    t.detect_btn
                   )}
-                  Détecter
                 </button>
               </div>
 
-              {/* Loader with rotating dynamic messages */}
               {isAnalyzing && (
-                <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-1.5 animate-pulse">
-                  <div className="flex items-center gap-2 text-indigo-900 font-extrabold text-xs">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                    <span>Scannage sémantique de l'URL en cours...</span>
+                <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-150 flex items-center gap-2.5 animate-pulse">
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin flex-shrink-0" />
+                  <div>
+                    <h5 className="text-[11px] font-bold text-indigo-900">{t.analyzing_text}</h5>
+                    <p className="text-[9px] text-indigo-950/70">{t.analyzing_desc}</p>
                   </div>
-                  <p className="text-[10px] text-indigo-700 font-medium leading-relaxed">
-                    Extraction des services certifiés, décryptage de l'accroche phare et conception automatique du format de campagne optimal.
-                  </p>
                 </div>
               )}
 
-              {/* Error warning banner */}
               {analysisError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[10px] text-red-750 font-bold leading-normal">
-                  ⚠️ {analysisError}
+                <div className="bg-red-50 text-red-700 p-2.5 rounded-lg text-[10px] border border-red-100 font-medium">
+                  {analysisError}
                 </div>
               )}
 
-              {/* INTERACTIVE SUBJECT CHECKBOX LIST PROPOSED BY IA */}
+              {/* DESCRIPT-LIKE EXPLICIT VALIDATION CHANNELS / SEQUENCE VERIFICATION STEP */}
               {analysisResult && (
-                <div className="space-y-3 p-3.5 border border-indigo-100 bg-gradient-to-b from-indigo-50/50 to-white rounded-2xl animate-in fade-in duration-300">
-                  <div className="flex justify-between items-center pb-2 border-b border-indigo-50">
-                    <span className="text-[11px] font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-                      🔎 Sujets pertinents retenus par l'IA
+                <div className="bg-slate-50/40 p-3 border border-slate-200 rounded-xl space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex justify-between items-center border-b border-slate-205 pb-1.5">
+                    <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-tight">
+                      {t.checked_topics_title}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allSelected = analysisResult.extractedTopics.every(t => t.selected);
-                        const nextTopics = analysisResult.extractedTopics.map(t => ({ ...t, selected: !allSelected }));
-                        setAnalysisResult({ ...analysisResult, extractedTopics: nextTopics });
-                        const selectedCount = nextTopics.filter(t => t.selected).length;
-                        onUpdateSettings({ ...settings, slideCount: Math.max(3, selectedCount) });
-                        const bulletPoints = nextTopics.filter(t => t.selected).map(t => `- ${t.title}: ${t.description}`).join("\n");
-                        setPrompt(`Slogan: ${analysisResult.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
-                      }}
-                      className="text-[10px] text-indigo-650 hover:underline font-extrabold"
+                  </div>
+
+                  <div className="flex gap-2 text-[9px] font-bold">
+                    <button 
+                      type="button" 
+                      onClick={() => toggleAllTopics(true)} 
+                      className="text-indigo-600 hover:underline"
                     >
-                      {analysisResult.extractedTopics.every(t => t.selected) ? "Tout décocher" : "Tout cocher"}
+                      {t.topics_all_check}
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button 
+                      type="button" 
+                      onClick={() => toggleAllTopics(false)} 
+                      className="text-indigo-600 hover:underline"
+                    >
+                      {t.topics_all_uncheck}
                     </button>
                   </div>
-                  
-                  <div className="space-y-2 max-h-[190px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 pr-1">
+
+                  {/* Checkbox loop of topics deduced by AI */}
+                  <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
                     {analysisResult.extractedTopics.map((topic) => (
-                      <label
+                      <div 
+                        id={`topic-item-${topic.id}`}
                         key={topic.id}
-                        className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        onClick={() => toggleTopic(topic.id)}
+                        className={`p-2 border rounded-lg cursor-pointer transition flex items-start gap-2.5 ${
                           topic.selected
-                            ? 'bg-white border-indigo-300 shadow-xs ring-1 ring-indigo-300/10'
-                            : 'bg-slate-50/55 border-slate-200 opacity-60 hover:opacity-90'
+                            ? 'bg-emerald-50/20 border-emerald-500/55 text-slate-800'
+                            : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50/50'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={topic.selected}
-                          onChange={() => toggleTopic(topic.id)}
-                          className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
-                        />
-                        <div className="flex-1 min-w-0 leading-tight">
-                          <p className="text-[11.5px] font-extrabold text-slate-800 leading-none">{topic.title}</p>
-                          <p className="text-[9.5px] text-slate-500 mt-1 leading-normal font-medium">{topic.description}</p>
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          topic.selected 
+                            ? 'bg-emerald-500 border-emerald-600 text-white' 
+                            : 'border-slate-300 bg-white'
+                        }`}>
+                          {topic.selected && <Check className="w-3 h-3 stroke-[3]" />}
                         </div>
-                      </label>
+                        <div className="flex-1 min-w-0 leading-tight">
+                          <h4 className={`text-[11px] font-extrabold truncate ${topic.selected ? 'text-emerald-950 font-bold' : 'text-slate-400 font-medium'}`}>
+                            {topic.title}
+                          </h4>
+                          <p className="text-[9px] mt-0.5 text-slate-500 leading-normal line-clamp-2">
+                            {topic.description}
+                          </p>
+                        </div>
+                      </div>
                     ))}
                   </div>
 
-                  <div className="bg-slate-50/70 p-2.5 rounded-xl space-y-1.5 border border-slate-150 text-[10px]">
-                    {analysisResult.suggestedSlogan && (
-                      <div className="flex items-start gap-1 font-medium">
-                        <span className="font-extrabold text-indigo-950 shrink-0">Accroche phare :</span>
-                        <span className="italic text-slate-700">"{analysisResult.suggestedSlogan}"</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-4 text-[9px] text-slate-500 font-bold uppercase tracking-wider">
-                      <span>Palette : <strong className="text-indigo-600">{analysisResult.suggestedVisualTheme}</strong></span>
-                      <span>Ton : <strong className="text-indigo-600">{analysisResult.suggestedTone}</strong></span>
+                  {/* Extracted slogan placeholder */}
+                  {analysisResult.suggestedSlogan && (
+                    <div className="bg-white border border-slate-150 p-2 rounded-lg space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase font-mono block">{t.slogan_label}</span>
+                      <p className="text-[11px] font-extrabold italic text-indigo-900 leading-tight">
+                        &ldquo;{analysisResult.suggestedSlogan}&rdquo;
+                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* 📝 Étape 2: Objectif Final & Consignes (Optionnel ou Pré-rempli) */}
+            {/* Step 2: Custom objectives and Prompt constraints */}
             <div className="space-y-1.5 border-t border-slate-100 pt-3">
-              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-indigo-600" /> 2. Objectif de la Vidéo & Description du sujet
+              <label className="text-[11px] font-extrabold text-slate-450 uppercase tracking-wider block">
+                {t.step_prompt}
               </label>
               <textarea
-                id="input-prompt"
-                placeholder="Rédigez ici ou laissez l'IA composer à partir des sujets du site web cochés ci-dessus..."
+                id="textarea-prompt-objective"
+                placeholder={t.textarea_prompt_placeholder}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
-                className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg p-2.5 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none resize-none leading-relaxed shadow-sm font-semibold"
+                className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-2 px-3 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none shadow-sm font-medium leading-relaxed resize-none"
               />
               <p className="text-[9px] text-slate-400">
-                Vous n'avez pas besoin de rédiger : les thèmes se synchronisent automatiquement si vous avez analysé un site.
+                {t.prompt_help}
               </p>
             </div>
 
-            {/* Style de Script */}
+            {/* Script Vibe Choice */}
             <div className="space-y-1.5 pt-1">
               <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                🎙️ Choix du Vibe & Voix Off
+                {t.voice_vibe_label}
               </label>
               <select
                 id="select-script-vibe"
@@ -614,18 +621,43 @@ export default function Sidebar({
                 onChange={(e) => setScriptVibe(e.target.value)}
                 className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-2 px-2.5 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm font-medium"
               >
-                <option value="energetic marketing">⚡ Vendeur & Énergique (Shorts/TikTok)</option>
-                <option value="educational explainer">🎓 Éducateur & Pédagogique (LinkedIn/Youtube)</option>
-                <option value="inspiring brand story">🌟 Inspirant & Storytelling de Marque</option>
-                <option value="relaxed corporate">💼 Professionnel Calme & Raisonné</option>
-                <option value="dramatic presentation">🎭 Théâtral & Cinématographique</option>
+                <option value="energetic marketing">{language === 'fr' ? '⚡ Vendeur & Énergique (Shorts/TikTok)' : '⚡ Sales & Energetic (Shorts/TikTok)'}</option>
+                <option value="educational explainer">{language === 'fr' ? '🎓 Éducateur & Pédagogique (LinkedIn)' : '🎓 Educator & Explainer (LinkedIn)'}</option>
+                <option value="inspiring brand story">{language === 'fr' ? '🌟 Inspirant & Storytelling de Marque' : '🌟 Inspiring & Brand Storytelling'}</option>
+                <option value="relaxed corporate">{language === 'fr' ? '💼 Professionnel Calme & Raisonné' : '💼 Focused Pro & Quiet corporate'}</option>
+                <option value="dramatic presentation">{language === 'fr' ? '🎭 Théâtral & Cinématographique' : '🎭 Intense & Cinematic'}</option>
               </select>
             </div>
 
-            {/* Theme Visual Fast Selection */}
+            {/* Slide Count selector */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <label className="text-[11px] font-extrabold text-slate-420 uppercase tracking-wider">
+                  {t.step_slides}
+                </label>
+                <span className="text-xs font-mono font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                  {activeSlideCount} Clips
+                </span>
+              </div>
+              <input
+                id="slider-slide-count"
+                type="range"
+                min={3}
+                max={6}
+                step={1}
+                value={activeSlideCount}
+                onChange={(e) => onUpdateSettings({ ...settings, slideCount: parseInt(e.target.value) })}
+                className="w-full accent-indigo-600 cursor-pointer"
+              />
+              <p className="text-[9px] text-slate-400 leading-normal">
+                {t.slides_recommended}
+              </p>
+            </div>
+
+            {/* Quick Palette select */}
             <div className="space-y-2 border-t border-slate-100 pt-3">
               <label className="text-[11px] font-extrabold text-slate-405 uppercase tracking-wider">
-                🎨 Palette Graphique
+                {t.palette_label}
               </label>
               <div className="grid grid-cols-5 gap-2">
                 {VISUAL_THEMES.map((theme) => {
@@ -636,9 +668,9 @@ export default function Sidebar({
                       key={theme.id}
                       type="button"
                       title={theme.name}
-                      onClick={() => onUpdateSettings({ ...settings, visualTheme: theme.id as any })}
+                      onClick={() => onUpdateSettings({ ...settings, visualTheme: theme.id })}
                       className={`h-7 rounded-md transition-all relative border cursor-pointer flex items-center justify-center ${theme.bgGradient} ${
-                        isActive ? 'border-indigo-600 ring-2 ring-indigo-600/20 scale-105 shadow-sm' : 'border-slate-200 hover:border-slate-300'
+                        isActive ? 'border-indigo-600 ring-2 ring-indigo-600/20 scale-105 shadow-sm' : 'border-slate-200 hover:border-slate-305'
                       }`}
                     >
                       {isActive && (
@@ -648,49 +680,15 @@ export default function Sidebar({
                   );
                 })}
               </div>
-              <p className="text-[10px] text-slate-500 font-semibold italic">
+              <p className="text-[9px] text-slate-500 font-semibold italic">
                 {VISUAL_THEMES.find(t => t.id === settings.visualTheme)?.styleDescription}
               </p>
             </div>
 
-            {/* Aspect Ratio Options (secondary manual choice) */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="font-extrabold text-slate-400 uppercase tracking-wider">Format d'Aspect manuel</span>
-                <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-extrabold font-mono uppercase">{settings.aspectRatio}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { id: '9:16', label: 'Vertical (9:16)', desc: 'Reels / TikTok' },
-                  { id: '1:1', label: 'Carré (1:1)', desc: 'Insta / LinkedIn' },
-                  { id: '16:9', label: 'Paysage (16:9)', desc: 'LinkedIn / Web' }
-                ].map((ratio) => {
-                  const isActive = settings.aspectRatio === ratio.id;
-                  return (
-                    <button
-                      id={`ratio-btn-${ratio.id.replace(':', '-')}`}
-                      key={ratio.id}
-                      type="button"
-                      onClick={() => onUpdateSettings({ ...settings, aspectRatio: ratio.id as any })}
-                      className={`p-1.5 rounded-lg border text-center transition cursor-pointer flex flex-col justify-center items-center ${
-                        isActive
-                          ? 'bg-indigo-50/70 border-indigo-200 text-indigo-705 font-bold shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      <span className="text-[10px] font-extrabold block leading-none">{ratio.label}</span>
-                      <span className="text-[7px] text-slate-400 mt-0.5 block tracking-normal leading-none">{ratio.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Logo de l'Entreprise avec Téléchargement Local & Drag and Drop */}
+            {/* Custom Logo Uploader section */}
             <div className="space-y-2 border-t border-slate-100 pt-4">
               <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>Logo Officiel de votre Marque</span>
-                <span className="text-[9px] text-indigo-650 bg-indigo-50 px-2 py-0.5 rounded-full font-bold">Local PNG/JPG</span>
+                <span>{t.logo_label}</span>
               </label>
               
               {settings.logoUrl ? (
@@ -704,8 +702,8 @@ export default function Sidebar({
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-slate-800 truncate">Logo chargé avec succès</p>
-                    <p className="text-[9px] text-slate-400">Dimensions préservées • Affichage HD encadré</p>
+                    <p className="text-[11px] font-bold text-slate-800 truncate">{t.logo_success}</p>
+                    <p className="text-[9px] text-slate-400">{t.logo_sub}</p>
                   </div>
                   <button 
                     type="button"
@@ -739,19 +737,18 @@ export default function Sidebar({
                     className="hidden"
                   />
                   <Upload className="w-6 h-6 text-indigo-500 mx-auto mb-1.5 animate-bounce" />
-                  <p className="text-[11px] font-bold text-slate-800">Glissez votre logo ou Cliquez ici</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">Formats acceptés : PNG, JPEG, JPG</p>
+                  <p className="text-[11px] font-bold text-slate-800">{t.logo_drag_placeholder}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">{t.logo_drag_sub}</p>
                 </div>
               )}
 
-              {/* URL fallback action toggle */}
               <div className="text-right">
                 <button
                   type="button"
                   onClick={() => setShowUrlLogoInput(!showUrlLogoInput)}
                   className="text-[9px] text-indigo-600 hover:underline font-bold"
                 >
-                  {showUrlLogoInput ? "Masquer l'option URL" : "Ou coller une URL de logo existante"}
+                  {showUrlLogoInput ? "Masquer l'option URL" : t.logo_url_option}
                 </button>
               </div>
 
@@ -760,7 +757,7 @@ export default function Sidebar({
                   <input
                     id="input-logo-url-backup"
                     type="text"
-                    placeholder="Collez l'URL de votre logo externe..."
+                    placeholder={t.logo_url_placeholder}
                     value={settings.logoUrl || ""}
                     onChange={(e) => onUpdateSettings({ ...settings, logoUrl: e.target.value })}
                     className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-2 px-3 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none shadow-sm"
@@ -769,24 +766,23 @@ export default function Sidebar({
               )}
             </div>
 
-            {/* Avatar Présentateur / Personnification */}
+            {/* Talking Presenter Layout option */}
             <div className="space-y-3.5 border-t border-slate-100 pt-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-indigo-600" /> Présentateur (Avatar Parlant)
+                  <User className="w-3.5 h-3.5 text-indigo-600" /> {t.talking_presenter_label}
                 </label>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Ajoutez un visage animé synchronisé aux paroles pour personnifier votre communication.
+                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                  {t.talking_presenter_desc}
                 </p>
               </div>
 
-              {/* Presenter Visual Types */}
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5 font-sans">
                 {[
-                  { id: 'none', label: 'Aucun' },
-                  { id: 'floating', label: 'Bulle' },
-                  { id: 'split-screen', label: 'Split' },
-                  { id: 'podcast-bubble', label: 'Podcast' }
+                  { id: 'none', label: t.avatar_none },
+                  { id: 'floating', label: t.avatar_bubble },
+                  { id: 'split-screen', label: t.avatar_split },
+                  { id: 'podcast-bubble', label: t.avatar_podcast }
                 ].map((style) => {
                   const isActive = (settings.avatarStyle || 'none') === style.id;
                   return (
@@ -797,13 +793,12 @@ export default function Sidebar({
                       onClick={() => onUpdateSettings({ 
                         ...settings, 
                         avatarStyle: style.id as any,
-                        // If turning on and no preset is selected, default to Sarah
                         avatarUrl: style.id !== 'none' && !settings.avatarUrl ? PRESET_AVATARS[0].imageUrl : settings.avatarUrl,
                         avatarPresetName: style.id !== 'none' && !settings.avatarPresetName ? PRESET_AVATARS[0].name : settings.avatarPresetName
                       })}
                       className={`py-1.5 rounded text-[10px] font-bold border transition-all text-center cursor-pointer ${
                         isActive
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-705 shadow-sm font-semibold'
                           : 'bg-white border-slate-200 text-slate-600 hover:text-slate-800'
                       }`}
                     >
@@ -813,12 +808,10 @@ export default function Sidebar({
                 })}
               </div>
 
-              {/* If Presenter is enabled, show avatar profile selection & customs */}
               {settings.avatarStyle && settings.avatarStyle !== 'none' && (
                 <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200/65 animate-in fade-in duration-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">Présentateur Pro</span>
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase">{t.preset_presenter_label}</span>
                   
-                  {/* Grid of presets */}
                   <div className="grid grid-cols-4 gap-1.5">
                     {PRESET_AVATARS.map((av) => {
                       const isActive = (settings.avatarPresetName === av.name) || (settings.avatarUrl === av.imageUrl);
@@ -849,9 +842,8 @@ export default function Sidebar({
                     })}
                   </div>
 
-                  {/* Or Custom Avatar URL */}
                   <div className="space-y-1 pt-1.5 border-t border-slate-200/50">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase">Ou URL de votre photo</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">{t.custom_avatar_url}</span>
                     <input
                       id="input-custom-avatar"
                       type="text"
@@ -862,14 +854,14 @@ export default function Sidebar({
                         avatarUrl: e.target.value,
                         avatarPresetName: "Custom"
                       })}
-                      className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-[10px] focus:ring-1 focus:ring-indigo-500/20 focus:outline-none"
+                      className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-[10px] focus:ring-1 focus:ring-indigo-500/20"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Primary Generation Call */}
+            {/* Primary Action Button */}
             <button
               id="btn-generate-storyboard"
               type="submit"
@@ -883,12 +875,12 @@ export default function Sidebar({
               {isGenerating ? (
                 <>
                   <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  Génération du Storyboard IA...
+                  {t.btn_generating_storyboard}
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Générer le Motion Design IA
+                  {t.btn_generate_storyboard}
                 </>
               )}
             </button>
@@ -896,11 +888,13 @@ export default function Sidebar({
         )}
 
         {activeTab === 'examples' && (
-          <div className="space-y-4">
+          <div className="space-y-4 font-sans select-none">
             <div className="bg-indigo-50/60 p-3.5 rounded-lg border border-indigo-100">
               <span className="text-[10px] uppercase font-bold text-indigo-900 tracking-wider">Note pratique</span>
-              <p className="text-[11px] text-indigo-950/80 mt-1 leading-relaxed">
-                Cliquez sur l'une des campagnes modélisées ci-dessous. Le système configurera l'outil de création et lancera la génération automatique.
+              <p className="text-[11px] text-indigo-950/80 mt-1 leading-relaxed font-semibold">
+                {language === 'fr' 
+                  ? "Sélectionnez un projet clé modélisé ci-dessous. Le système configurera l'URL, déduira ses thèmes uniques et remplira les consignes pour une génération clé-en-main."
+                  : "Select a key project modeled below. The system will pre-configure URL and prompt so you can easily validate and test."}
               </p>
             </div>
             
@@ -916,15 +910,15 @@ export default function Sidebar({
                     <h3 className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
                       {ex.title}
                     </h3>
-                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 font-medium">
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 font-medium font-bold">
                       {ex.vibe}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
                     {ex.prompt}
                   </p>
-                  <div className="pt-2 text-[10px] text-slate-500 flex items-center gap-1.5 overflow-hidden">
-                    <Link2 className="w-3 h-3 flex-shrink-0 text-indigo-600/85" />
+                  <div className="pt-2 text-[10px] text-slate-500 flex items-center gap-1.5 overflow-hidden font-medium">
+                    <Link2 className="w-3 h-3 flex-shrink-0 text-indigo-650" />
                     <span className="truncate">{ex.url}</span>
                   </div>
                 </button>
@@ -934,18 +928,18 @@ export default function Sidebar({
         )}
 
         {activeTab === 'settings' && (
-          <div className="space-y-5 text-xs text-slate-600">
+          <div className="space-y-5 text-xs text-slate-600 font-sans select-none">
             <h3 className="font-bold text-slate-700 tracking-wider uppercase text-xs">Spécifications de l'Outil</h3>
             
-            <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 shadow-inner">
+            <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
               <div className="space-y-1">
                 <span className="text-[10px] text-slate-400 uppercase font-mono">Modèle Utilisé (Script)</span>
-                <p className="text-xs text-slate-800 font-semibold">Gemini 3.5 Flash</p>
+                <p className="text-xs text-slate-800 font-semibold text-emerald-700">Gemini 3.5 Flash & 3.1 Flash-Lite Fallback</p>
               </div>
               
               <div className="space-y-1">
                 <span className="text-[10px] text-slate-400 uppercase font-mono">Synthèse Vocale (Voice-Over)</span>
-                <p className="text-xs text-slate-800 font-semibold">Gemini 3.1 TTS Preview</p>
+                <p className="text-xs text-slate-800 font-semibold">Gemini 3.1 TTS Preview Audio Pipeline</p>
               </div>
 
               <div className="space-y-1">
@@ -962,7 +956,7 @@ export default function Sidebar({
                 <button
                   id="export-canvas"
                   onClick={() => onUpdateSettings({ ...settings, exportFormat: 'web-canvas' })}
-                  className={`p-2.5 rounded border text-center font-medium cursor-pointer transition-all ${
+                  className={`p-2.5 rounded border text-center font-bold cursor-pointer transition-all ${
                     settings.exportFormat === 'web-canvas'
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                       : 'border-slate-200 hover:border-slate-300 text-slate-500'
@@ -972,8 +966,9 @@ export default function Sidebar({
                 </button>
                 <button
                   id="export-mp4"
+                  type="button"
                   onClick={() => onUpdateSettings({ ...settings, exportFormat: 'mp4' })}
-                  className={`p-2.5 rounded border text-center font-medium cursor-pointer transition-all ${
+                  className={`p-2.5 rounded border text-center font-bold cursor-pointer transition-all ${
                     settings.exportFormat === 'mp4'
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                       : 'border-slate-200 hover:border-slate-300 text-slate-500'

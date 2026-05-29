@@ -17,7 +17,7 @@ import Sidebar from "./components/Sidebar";
 import VideoPlayer from "./components/VideoPlayer";
 import Timeline from "./components/Timeline";
 import ControlPanel from "./components/ControlPanel";
-import { DEFAULT_PROJECT } from "./constants";
+import { DEFAULT_PROJECT, I18N_DICTS } from "./constants";
 import { Project, ProjectSettings, Scene } from "./types";
 
 export default function App() {
@@ -26,6 +26,13 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   
+  // High-precision internationalization (i18n) controls
+  const [language, setLanguage] = useState<'fr' | 'en'>('fr');
+  const [workingLanguage, setWorkingLanguage] = useState<'fr' | 'en'>('fr');
+
+  // Strict onboarding/validation state
+  const [hasGenerated, setHasGenerated] = useState(false);
+
   // Applet lifecycle state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationLogs, setGenerationLogs] = useState<string[]>([]);
@@ -43,6 +50,8 @@ export default function App() {
   const [exportDestination, setExportDestination] = useState<'downloads' | 'ask'>('downloads');
   const [exportFilename, setExportFilename] = useState("campagne-aura-motion.mp4");
   const [exportResolution, setExportResolution] = useState<'725p' | '1080p' | '4k'>('1080p');
+
+  const t = I18N_DICTS[language];
 
   const handleUpdateSettings = (newSettings: ProjectSettings) => {
     setProject(prev => ({
@@ -63,24 +72,42 @@ export default function App() {
   };
 
   // Triggers main server analysis & storyboard creation endpoint
-  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number }) => {
+  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en' }) => {
     setIsGenerating(true);
     setGlobalError(null);
-    setGenerationLogs(["Initiation du moteur d'analyse sémantique...", "Connexion à Google Gemini Cloud..."]);
+    
+    const logsInitFr = [
+      "Initié : Connexion sécurisée au moteur sémantique...",
+      "Chargement du module d'analyse multilingue...",
+      `Langue cible paramétrée : ${payload.workingLanguage === 'en' ? 'Anglais 🇬🇧' : 'Français 🇫🇷'}`
+    ];
+    const logsInitEn = [
+      "Initiated: Securing semantic node connection...",
+      "Booting multilingual text models...",
+      `Target processing language set to: ${payload.workingLanguage === 'en' ? 'English 🇬🇧' : 'French 🇫🇷'}`
+    ];
+
+    setGenerationLogs(payload.workingLanguage === 'en' ? logsInitEn : logsInitFr);
     
     try {
-      // Simulate real-time logs for visual reinforcement
       const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
       
       if (payload.url) {
-        setGenerationLogs(prev => [...prev, `Analyse du site web demandée : ${payload.url}`, "Tentative de scraping du code source HTML..."]);
-        await delay(600);
+        setGenerationLogs(prev => [
+          ...prev, 
+          language === 'fr' ? `Analyse active du site : ${payload.url}` : `Crawling target page: ${payload.url}`,
+          language === 'fr' ? "Scraping du contenu textuel de la page principale..." : "Analyzing structural HTML node contents..."
+        ]);
+        await delay(700);
       }
       
-      setGenerationLogs(prev => [...prev, `Traitement avec Gemini 3.5-Flash sur l'intention : "${payload.prompt || 'Création libre'}"...`]);
+      setGenerationLogs(prev => [
+        ...prev, 
+        language === 'fr' 
+          ? `Traitement IA avec l'objectif : "${payload.prompt || 'Génération libre'}"` 
+          : `Processing intent constraints: "${payload.prompt || 'Free Generation'}"`
+      ]);
       await delay(700);
-
-      setGenerationLogs(prev => [...prev, `Génération des ${payload.slideCount} diapositives de services de manière optimisée...`]);
 
       const response = await fetch("/api/generate-storyboard", {
         method: "POST",
@@ -91,7 +118,8 @@ export default function App() {
           aspectRatio: project.settings.aspectRatio,
           visualTheme: project.settings.visualTheme,
           scriptVibe: payload.scriptVibe,
-          slideCount: payload.slideCount
+          slideCount: payload.slideCount,
+          workingLanguage: payload.workingLanguage
         })
       });
 
@@ -111,7 +139,10 @@ export default function App() {
             }
           }
         } catch (_) {}
-        throw new Error(`Le serveur a retourné une erreur (Code: ${response.status})${serverErrorMessage}`);
+        throw new Error(language === 'fr' 
+          ? `Erreur de traitement (Serveur Code: ${response.status})${serverErrorMessage}` 
+          : `Generation failed (Server Code: ${response.status})${serverErrorMessage}`
+        );
       }
 
       const outcome = await response.json();
@@ -123,15 +154,17 @@ export default function App() {
           duration: Number(scene.duration) || 5,
           subtitle: scene.subtitle || "Message sous-titré généré par l'IA",
           visual: {
-            title: scene.visual?.title || "AI MESSAGE",
+            title: scene.visual?.title || "Aura Message",
             subtitle: scene.visual?.subtitle || "",
             accentWord: scene.visual?.accentWord || "",
-            backgroundColor: scene.visual?.backgroundColor || "bg-gradient-to-br from-[#0c0f1d] to-[#11162d]",
+            backgroundColor: scene.visual?.backgroundColor || "bg-gradient-to-br from-[#0f172a] to-[#1e293b]",
             backgroundType: scene.visual?.backgroundType || "gradient",
             textPosition: scene.visual?.textPosition || "center",
             textStyle: scene.visual?.textStyle || "minimal",
             animationType: scene.visual?.animationType || "fade",
-            assetKeywords: scene.visual?.assetKeywords || "neon abstract"
+            assetKeywords: scene.visual?.assetKeywords || "abstract tech",
+            fontFamily: scene.visual?.fontFamily || "inter",
+            customAccentColor: scene.visual?.customAccentColor
           },
           audio: {
             voiceName: scene.audio?.voiceName || "Zephyr",
@@ -144,7 +177,6 @@ export default function App() {
 
         const safeSlogan = typeof outcome.suggestedSlogan === 'string' ? outcome.suggestedSlogan : "";
         const safeTone = typeof outcome.detectedTone === 'string' ? outcome.detectedTone : "";
-
         const savedLogo = outcome.scrapedLogoUrl || project.settings.logoUrl;
 
         setProject({
@@ -157,23 +189,24 @@ export default function App() {
         });
 
         if (savedLogo) {
-          setGenerationLogs(prev => [...prev, `✨ Charte graphique & Logo de marque intégrés avec succès.`]);
+          setGenerationLogs(prev => [...prev, language === 'fr' ? `✨ Logotype de marque scanné et intégré.` : `✨ Scraped brand logotype integrated successfully.`]);
         }
 
         if (safeSlogan) setFeedbackSlogan(safeSlogan);
         if (safeTone) setFeedbackTone(safeTone);
 
-        setGenerationLogs(prev => [...prev, "✨ Storyboard compilé avec succès ! Chargement dans le séquenceur."]);
+        setGenerationLogs(prev => [...prev, language === 'fr' ? "✨ Storyboard compilé avec succès." : "✨ Storyboard generated! Preparing video timeline."]);
         setActiveSceneIndex(0);
         setCurrentTime(0);
+        setHasGenerated(true);
       } else {
-        throw new Error("Aucune séquence exploitable n'a été retournée par l'IA.");
+        throw new Error(language === 'fr' ? "Aucun clip exploitable n'a été retourné." : "No scenes could be generated from requested URL.");
       }
 
     } catch (err: any) {
       console.error(err);
       setGlobalError(err.message || "Impossible de contacter l'agent de génération.");
-      setGenerationLogs(prev => [...prev, "❌ Échec de la génération. Rétablissement du scénario par défaut."]);
+      setGenerationLogs(prev => [...prev, "❌ Échec de la génération."]);
     } finally {
       setIsGenerating(false);
     }
@@ -185,7 +218,7 @@ export default function App() {
       const response = await fetch("/api/polish-scene", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: rawText })
+        body: JSON.stringify({ text: rawText, language: workingLanguage })
       });
       if (!response.ok) {
         throw new Error("Polish request failed");
@@ -202,16 +235,25 @@ export default function App() {
   const handleSimulateExport = () => {
     setIsExporting(true);
     setExportProgress(0);
-    setExportStepMessage("Vérification des codecs de rendu...");
+    setExportStepMessage(language === 'fr' ? "Initialisation de l'encodeur publicitaire..." : "Initializing video compiler...");
     
-    const steps = [
+    const stepsFr = [
       { prg: 15, msg: "Fusion des calques graphiques et dégradés CSS..." },
       { prg: 35, msg: "Génération automatique des pistes vocales en waves..." },
-      { prg: 60, msg: "Synchronisation des sous-titres et micro-animations..." },
-      { prg: 80, msg: "Synthèse audio et mixage de la boucle musicale..." },
-      { prg: 105, msg: "Finalisation du fichier conteneur MP4 (H264/AAC)..." },
-      { prg: 100, msg: "Vidéo prête au téléchargement !" }
+      { prg: 65, msg: "Synchronisation des sous-titres et micro-animations..." },
+      { prg: 85, msg: "Compilation de la boucle musicale audio d'ambiance..." },
+      { prg: 100, msg: "Vidéo publicitaire finalisée pour téléchargement !" }
     ];
+
+    const stepsEn = [
+      { prg: 15, msg: "Rendering dynamic canvas CSS background layers..." },
+      { prg: 35, msg: "Synthesizing individual narration wave tracks..." },
+      { prg: 65, msg: "Stretching text transition timings and keyframes..." },
+      { prg: 85, msg: "Blending background music loops into Master track..." },
+      { prg: 100, msg: "MP4 Video file container is ready for download!" }
+    ];
+
+    const steps = language === 'fr' ? stepsFr : stepsEn;
 
     let currentStep = 0;
     const interval = setInterval(() => {
@@ -234,7 +276,6 @@ export default function App() {
           const blob = new Blob([videoReportDetails], { type: "text/plain;charset=utf-8" });
           const clnFilename = exportFilename.toLowerCase().endsWith('.mp4') ? exportFilename : `${exportFilename}.mp4`;
 
-          // Handle manual file system picker if supported and requested
           let saveSuccess = false;
           if (exportDestination === 'ask') {
             try {
@@ -255,12 +296,11 @@ export default function App() {
                 setGenerationLogs(prev => [...prev, `💾 Vidéo [${clnFilename}] enregistrée manuellement à l'emplacement choisi par l'utilisateur.`]);
               }
             } catch (err) {
-              console.warn("showSaveFilePicker is restricted or was cancelled inside iframe sandbox, falling back to standard download.", err);
+              console.warn("showSaveFilePicker restriction in sandbox, choosing fallbacks.", err);
             }
           }
 
           if (!saveSuccess) {
-            // Priority Fallback: Direct download trigger into browser's default downloads location
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -269,7 +309,7 @@ export default function App() {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            setGenerationLogs(prev => [...prev, `📥 Fichier [${clnFilename}] téléchargé avec succès dans le dossier "Téléchargements" de votre PC.`]);
+            setGenerationLogs(prev => [...prev, `📥 Fichier [${clnFilename}] téléchargé avec succès.`]);
           }
         }, 1200);
         return;
@@ -282,29 +322,27 @@ export default function App() {
   };
 
   return (
-    <div id="aura-master-studio" className="flex h-screen bg-slate-50 text-slate-800 flex-col overflow-hidden font-sans">
+    <div id="aura-master-studio" className="flex h-screen bg-slate-50 text-slate-800 flex-col overflow-hidden font-sans select-none">
       
-      {/* Top Banner alert notifying about sandbox environment */}
-      <header className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
+      {/* Top Banner alert */}
+      <header className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-xs z-20">
         <div className="flex items-center gap-2.5">
           <Film className="w-5 h-5 text-indigo-600" />
-          <span className="text-sm font-bold tracking-tight text-slate-800">Aura Motion Studio Dashboard</span>
-          <span className="text-[10px] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded text-indigo-600 font-semibold uppercase tracking-wider">
-            Mode Créatif Actif
+          <span className="text-sm font-black font-sans tracking-tight text-slate-800 uppercase">AURA MOTION STUDIO</span>
+          <span className="text-[9px] bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded text-indigo-700 font-bold uppercase tracking-wider">
+            {language === 'fr' ? 'CO-PILOTE IA' : 'AI CO-PILOT'}
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Quick Stats summaries */}
-          <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-200">
-            <span className="font-mono text-[10px] text-slate-400">TON DÉTECTÉ:</span>
-            <span className="font-bold text-slate-700 max-w-[120px] truncate">{feedbackTone}</span>
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 py-1.5 px-3 rounded-lg border border-slate-250">
+            <span className="font-mono text-[9px] text-slate-400 font-bold uppercase">{language === 'fr' ? 'TON DU PROJET' : 'PROJECT TONE'}:</span>
+            <span className="font-bold text-slate-700 max-w-[125px] truncate">{feedbackTone}</span>
           </div>
 
           <button
             id="btn-global-export"
             onClick={() => {
-              // Pre-fill suggested filename from project settings name
               const slug = project.settings.name
                 .toLowerCase()
                 .replace(/[^a-z0-0]/gi, '-')
@@ -313,10 +351,10 @@ export default function App() {
               setExportFilename(`${slug}.mp4`);
               setShowExportConfig(true);
             }}
-            disabled={isGenerating || isExporting}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+            disabled={isGenerating || isExporting || !hasGenerated || project.scenes.length === 0}
+            className="px-4 py-2 bg-indigo-650 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5" /> Exporter la Vidéo publicitaire
+            <Download className="w-3.5 h-3.5" /> {t.export_btn}
           </button>
         </div>
       </header>
@@ -330,6 +368,14 @@ export default function App() {
           onUpdateSettings={handleUpdateSettings}
           onGenerateStoryboard={handleGenerateStoryboard}
           isGenerating={isGenerating}
+          language={language}
+          setLanguage={setLanguage}
+          workingLanguage={workingLanguage}
+          setWorkingLanguage={setWorkingLanguage}
+          onLoadPresetDemo={() => {
+            setProject(DEFAULT_PROJECT);
+            setHasGenerated(true);
+          }}
         />
 
         {/* Center Section: Video Preview Canvas + Log alerts + Séquence timeline */}
@@ -337,10 +383,10 @@ export default function App() {
           
           {/* Global error panel if exists */}
           {globalError && (
-            <div className="m-4 p-3 bg-red-50 border border-red-200 text-red-900 rounded-xl flex items-start gap-2.5 text-xs">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="m-4 p-3.5 bg-red-50 border border-red-200 text-red-900 rounded-xl flex items-start gap-2.5 text-xs">
+              <AlertCircle className="w-4 h-4 text-red-650 flex-shrink-0 mt-0.5 animate-bounce" />
               <div>
-                <p className="font-semibold">Erreur de traitement sémantique</p>
+                <p className="font-bold">Erreur de traitement sémantique</p>
                 <p className="text-[11px] text-red-700 mt-0.5">{globalError}</p>
               </div>
             </div>
@@ -348,25 +394,25 @@ export default function App() {
 
           {/* If generating, display a gorgeous abstract logs terminal screen */}
           {isGenerating ? (
-            <div id="generation-loading-overlay" className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50/95 backdrop-blur z-30 space-y-6">
+            <div id="generation-loading-overlay" className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50/95 backdrop-blur z-30 space-y-6 animate-in fade-in duration-300">
               <div className="relative">
                 <div className="w-16 h-16 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
                 <Sparkles className="w-6 h-6 text-indigo-600 absolute inset-0 m-auto animate-pulse" />
               </div>
 
               <div className="text-center space-y-2 max-w-sm">
-                <h3 className="text-sm font-semibold text-slate-800">Analyse et Synthèse Sémantique</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  L'intelligence artificielle analyse le style de votre prompt ou les accroches de votre site web pour générer le story-board publicitaire.
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Analyse et Synthèse Sémantique</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+                  L'intelligence artificielle analyse le style de votre prompt, les accroches de votre site web pour générer le story-board publicitaire.
                 </p>
               </div>
 
               {/* Progress dynamic debug logs */}
               <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-[10px] text-slate-300 space-y-1.5 h-36 overflow-y-auto shadow-inner">
                 {generationLogs.map((log, index) => (
-                  <div key={index} className="flex gap-2 items-start">
+                  <div key={index} className="flex gap-2 items-start animate-in slide-in-from-bottom-1 duration-155">
                     <span className="text-indigo-400 select-none">&gt;</span>
-                    <span className={log.includes('❌') ? 'text-red-400' : log.includes('✨') ? 'text-emerald-400' : 'text-slate-300'}>{log}</span>
+                    <span className={log.includes('❌') ? 'text-red-400 font-bold' : log.includes('✨') ? 'text-emerald-400 font-bold' : 'text-slate-305'}>{log}</span>
                   </div>
                 ))}
               </div>
@@ -380,31 +426,42 @@ export default function App() {
               setIsPlaying={setIsPlaying}
               currentTime={currentTime}
               setCurrentTime={setCurrentTime}
+              hasGenerated={hasGenerated}
+              setHasGenerated={setHasGenerated}
+              onLoadPresetDemo={() => {
+                setProject(DEFAULT_PROJECT);
+                setHasGenerated(true);
+              }}
+              language={language}
             />
           )}
 
           {/* Bottom section: Sequence lists */}
-          <Timeline
-            project={project}
-            activeSceneIndex={activeSceneIndex}
-            setActiveSceneIndex={setActiveSceneIndex}
-            onUpdateScenes={handleUpdateScenes}
-          />
+          {hasGenerated && project.scenes.length > 0 && (
+            <Timeline
+              project={project}
+              activeSceneIndex={activeSceneIndex}
+              setActiveSceneIndex={setActiveSceneIndex}
+              onUpdateScenes={handleUpdateScenes}
+              language={language}
+            />
+          )}
         </main>
 
         {/* Right Side: Specific Scene Details / Inspector */}
         <ControlPanel
-          scene={project.scenes[activeSceneIndex]}
+          scene={hasGenerated && project.scenes.length > 0 ? project.scenes[activeSceneIndex] : (null as any)}
           onChangeScene={(updatedScene) => {
             const updated = [...project.scenes];
             updated[activeSceneIndex] = updatedScene;
             handleUpdateScenes(updated);
           }}
           onPolishWithAi={handlePolishWithAi}
+          language={language}
         />
       </div>
 
-      {/* Configuration d'Exportation & Choix de l'emplacement cible */}
+      {/* Configuration d'Exportation */}
       {showExportConfig && (
         <div id="export-config-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-white border border-slate-205 p-6 rounded-2xl shadow-2xl space-y-5 select-none animate-in scale-in duration-200">
@@ -538,7 +595,7 @@ export default function App() {
                   setShowExportConfig(false);
                   handleSimulateExport();
                 }}
-                className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Check className="w-3.5 h-3.5" /> Compiler & Exporter
               </button>
@@ -553,7 +610,7 @@ export default function App() {
           <div className="w-full max-w-md bg-white border border-slate-200 p-6 rounded-2xl shadow-2xl space-y-5 select-none">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
-                <Film className="w-5 h-5 text-indigo-600" />
+                <Film className="w-5 h-5 text-indigo-650" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Exportation du Rendu Publicitaire</h3>
@@ -564,9 +621,9 @@ export default function App() {
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-mono">
                 <span className="text-slate-500">{exportStepMessage}</span>
-                <span className="text-indigo-600 font-bold">{exportProgress}%</span>
+                <span className="text-indigo-650 font-bold">{exportProgress}%</span>
               </div>
-              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-sm">
+              <div className="h-2.5 w-full bg-slate-105 rounded-full overflow-hidden border border-slate-200 shadow-sm">
                 <div 
                   style={{ width: `${exportProgress}%` }}
                   className="h-full bg-indigo-600 transition-all duration-300 rounded"
