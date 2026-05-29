@@ -298,15 +298,21 @@ app.post("/api/generate-storyboard", async (req, res) => {
 
     let scrapedContext = "";
     let scrapedLogoUrl = "";
-    if (url && url.trim().length > 3) {
-      console.log(`Analyzing url: ${url}`);
+
+    // OPTIMIZATION: Check if prompt already contains pre-analyzed metadata or slogan details
+    const isAlreadyScraped = prompt && (prompt.includes("Thèmes") || prompt.includes("Slogan:") || prompt.length > 120);
+
+    if (!isAlreadyScraped && url && url.trim().length > 3) {
+      console.log(`Analyzing url inside generate-storyboard: ${url}`);
       try {
         const result = await fetchAndAnalyzeUrl(url);
         scrapedContext = result.context;
         scrapedLogoUrl = result.logoUrl;
       } catch (err: any) {
-        console.error("Scraping details failed:", err.message);
+        console.error("Scraping details failed inside generate-storyboard:", err.message);
       }
+    } else {
+      console.log("Skipping redundant scraping inside generate-storyboard as prompt contains pre-scraped bullet points.");
     }
 
     const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
@@ -351,7 +357,7 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
 `;
 
     const response = await generateContentWithFallback(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-3.1-flash-lite",
       contents: [
         { text: instruction },
         { text: userMessage }
@@ -507,7 +513,7 @@ Do not wrap in quotes or add metadata. Output only the refined sentence.
 `;
 
     const response = await generateContentWithFallback(ai, {
-      model: "gemini-3.5-flash",
+      model: "gemini-3.1-flash-lite",
       contents: [
         { text: instruction },
         { text: `Raw sentence: "${text}"` }
