@@ -27,22 +27,36 @@ const getGeminiClient = () => {
 
 // Extremely robust model helper with automatic fallback to prevent 503 Service Unavailable errors
 async function generateContentWithFallback(ai: any, params: any) {
-  const primaryModel = params.model || "gemini-3.5-flash";
-  const backupModel = primaryModel === "gemini-3.5-flash" ? "gemini-3.1-flash-lite" : "gemini-3.5-flash";
+  const modelsQueue = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const userRequestModel = params.model;
   
-  try {
-    console.log(`[AI Model] Attempting generation with primary model: ${primaryModel}`);
-    return await ai.models.generateContent(params);
-  } catch (error: any) {
-    console.warn(`[AI Model] Primary model ${primaryModel} failed: ${error.message || error}. Falling back to ${backupModel}...`);
+  // Pivot modelsQueue so that the user requested model is first
+  if (userRequestModel && modelsQueue.includes(userRequestModel)) {
+    const idx = modelsQueue.indexOf(userRequestModel);
+    modelsQueue.splice(idx, 1);
+    modelsQueue.unshift(userRequestModel);
+  } else if (userRequestModel) {
+    modelsQueue.unshift(userRequestModel);
+  }
+
+  let finalError: any = null;
+  for (const model of modelsQueue) {
     try {
-      const fallbackParams = { ...params, model: backupModel };
-      return await ai.models.generateContent(fallbackParams);
-    } catch (fallbackError: any) {
-      console.error(`[AI Model] Fallback model ${backupModel} also failed:`, fallbackError);
-      throw error; // throw original error if fallback also fails
+      console.log(`[AI Model] Attempting generation with model: ${model}`);
+      const response = await ai.models.generateContent({
+        ...params,
+        model: model
+      });
+      console.log(`[AI Model] Success using model: ${model}`);
+      return response;
+    } catch (error: any) {
+      console.warn(`[AI Model] Model ${model} failed: ${error.message || error}`);
+      finalError = error;
     }
   }
+  
+  console.error(`[AI Model] All configured fallback models failed to resolve the request.`);
+  throw finalError || new Error("All AI models are currently experiencing high demand. Please try again in a moment.");
 }
 
 // Combined fast single-fetch HTML helper to scrape context + logo in one go
@@ -56,7 +70,7 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
       try {
         controller.abort();
       } catch (_) {}
-    }, 10000); // Increased to 10 seconds to allow stable DNS/SSL/Network handling
+    }, 3500); // Set to 3.5 seconds to fail fast and seamlessly trigger AI-based fallback if site is slow/offline
  
     const response = await fetch(formattedUrl, {
       headers: {
@@ -123,6 +137,9 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
     if (logoUrl) {
       if (logoUrl.startsWith('/')) {
         logoUrl = logoUrl.startsWith('//') ? `https:${logoUrl}` : `${origin}${logoUrl}`;
+      } else if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+        // Resolve pure relative path (e.g. templates/legrub/logo.png -> https://le-grub.com/templates/legrub/logo.png)
+        logoUrl = `${origin}/${logoUrl}`;
       }
     } else {
       logoUrl = `${origin}/favicon.ico`;
