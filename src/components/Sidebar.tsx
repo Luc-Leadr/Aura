@@ -20,7 +20,8 @@ import {
   Music,
   Tv,
   Globe,
-  Trash2
+  Trash2,
+  RefreshCw
 } from "lucide-react";
 import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS } from "../constants";
 import { ProjectSettings, AspectRatio } from "../types";
@@ -43,6 +44,19 @@ export default function Sidebar({
   const [scriptVibe, setScriptVibe] = useState("energetic marketing");
   const [activeTab, setActiveTab] = useState<'create' | 'examples' | 'settings'>('create');
   
+  // Website auto-proposition states
+  const [analysisResult, setAnalysisResult] = useState<{
+    detectedTitle: string;
+    suggestedSlogan: string;
+    suggestedPlatform: 'tiktok' | 'instagram' | 'linkedin';
+    suggestedVisualTheme: 'modern-dark' | 'neon-pulse' | 'warm-editorial' | 'clean-corporate' | 'brutalist-yellow';
+    suggestedTone: string;
+    scrapedLogoUrl: string;
+    extractedTopics: Array<{ id: string; title: string; description: string; selected: boolean }>;
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   // Local drag-and-drop states
   const [dragActive, setDragActive] = useState(false);
   const [showUrlLogoInput, setShowUrlLogoInput] = useState(false);
@@ -51,6 +65,92 @@ export default function Sidebar({
   // Default parameters if undefined (protective layer)
   const activePlatform = settings.platform || 'tiktok';
   const activeSlideCount = settings.slideCount || 4;
+
+  const handleAnalyzeWebsite = async () => {
+    if (!url || url.trim().length < 3) {
+      setAnalysisError("Veuillez saisir une adresse URL valide.");
+      return;
+    }
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const response = await fetch("/api/analyze-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() })
+      });
+      if (!response.ok) {
+        throw new Error("L'analyse du site a échoué. Vérifiez que l'URL est correcte et accessible.");
+      }
+      const data = await response.json();
+      if (data && data.extractedTopics) {
+        setAnalysisResult({
+          detectedTitle: data.detectedTitle || "Ma Marque",
+          suggestedSlogan: data.suggestedSlogan || "",
+          suggestedPlatform: (data.suggestedPlatform === "tiktok" || data.suggestedPlatform === "instagram" || data.suggestedPlatform === "linkedin") ? data.suggestedPlatform : "instagram",
+          suggestedVisualTheme: data.suggestedVisualTheme || "modern-dark",
+          suggestedTone: data.suggestedTone || "energetic marketing",
+          scrapedLogoUrl: data.scrapedLogoUrl || "",
+          extractedTopics: data.extractedTopics.map((topic: any) => ({
+            ...topic,
+            selected: true
+          }))
+        });
+
+        // Push recommendations directly into active project settings
+        const proposedPlatform = data.suggestedPlatform || 'instagram';
+        let targetRatio: AspectRatio = '1:1';
+        if (proposedPlatform === 'linkedin') targetRatio = '16:9';
+        else if (proposedPlatform === 'tiktok') targetRatio = '9:16';
+
+        onUpdateSettings({
+          ...settings,
+          name: data.detectedTitle || settings.name,
+          platform: proposedPlatform,
+          aspectRatio: targetRatio,
+          visualTheme: data.suggestedVisualTheme || settings.visualTheme,
+          logoUrl: data.scrapedLogoUrl || settings.logoUrl,
+          slideCount: data.extractedTopics.length
+        });
+
+        setScriptVibe(data.suggestedTone || "energetic marketing");
+        
+        // Build clear description prompt
+        const bulletPoints = data.extractedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
+        setPrompt(`Slogan: ${data.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
+      } else {
+        throw new Error("Aucun sujet exploitable n'a été extrait du site.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisError(err.message || "Impossible de contacter l'agent d'analyse du site web.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const toggleTopic = (id: string) => {
+    if (!analysisResult) return;
+    const updatedTopics = analysisResult.extractedTopics.map(t => {
+      if (t.id === id) {
+        return { ...t, selected: !t.selected };
+      }
+      return t;
+    });
+    setAnalysisResult({
+      ...analysisResult,
+      extractedTopics: updatedTopics
+    });
+
+    const checkedTopics = updatedTopics.filter(t => t.selected);
+    onUpdateSettings({
+      ...settings,
+      slideCount: Math.max(3, checkedTopics.length)
+    });
+
+    const bulletPoints = checkedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
+    setPrompt(`Slogan: ${analysisResult.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -356,44 +456,144 @@ export default function Sidebar({
                 <span>6 (Exhaustif)</span>
               </div>
               <p className="text-[9px] text-slate-500 leading-tight">
-                Chaque service ou argument clé de votre site correspondra à une diapositive dédiée de <strong>{Math.max(3, Math.floor(18 / activeSlideCount))}s</strong> pour une vidéo percutante de 15 à 20 secondes.
+                Chaque service ou argument clé de votre site correspondra à une diapositive dédiée de <strong>{Math.max(3, Math.floor(18 / activeSlideCount))}s</strong> pour une vidéo percutante.
               </p>
             </div>
 
-            {/* 🌐 Étape 2: Analyser un Site Web (URL) */}
+            {/* 🌐 Étape 1 : Import & Analyse du Site Internet */}
+            <div className="space-y-2 border-t border-slate-150 pt-3">
+              <label className="text-[11px] font-extrabold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" /> 1. Analyser un Site Web (Fortement Recommandé)
+              </label>
+              
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    id="input-url"
+                    type="text"
+                    placeholder="ex: ma-marque-responsable.fr"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="w-full bg-white border border-slate-205 text-slate-800 rounded-xl py-2.5 pl-9 pr-3 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-xs font-semibold"
+                  />
+                  <Link2 className="absolute left-3 top-3 w-3.5 h-3.5 text-slate-400" />
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={handleAnalyzeWebsite}
+                  disabled={isAnalyzing || isGenerating || !url.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-extrabold px-3.5 rounded-xl text-xs transition shadow-sm cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  {isAnalyzing ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  Détecter
+                </button>
+              </div>
+
+              {/* Loader with rotating dynamic messages */}
+              {isAnalyzing && (
+                <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-1.5 animate-pulse">
+                  <div className="flex items-center gap-2 text-indigo-900 font-extrabold text-xs">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                    <span>Scannage sémantique de l'URL en cours...</span>
+                  </div>
+                  <p className="text-[10px] text-indigo-700 font-medium leading-relaxed">
+                    Extraction des services certifiés, décryptage de l'accroche phare et conception automatique du format de campagne optimal.
+                  </p>
+                </div>
+              )}
+
+              {/* Error warning banner */}
+              {analysisError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[10px] text-red-750 font-bold leading-normal">
+                  ⚠️ {analysisError}
+                </div>
+              )}
+
+              {/* INTERACTIVE SUBJECT CHECKBOX LIST PROPOSED BY IA */}
+              {analysisResult && (
+                <div className="space-y-3 p-3.5 border border-indigo-100 bg-gradient-to-b from-indigo-50/50 to-white rounded-2xl animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center pb-2 border-b border-indigo-50">
+                    <span className="text-[11px] font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                      🔎 Sujets pertinents retenus par l'IA
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allSelected = analysisResult.extractedTopics.every(t => t.selected);
+                        const nextTopics = analysisResult.extractedTopics.map(t => ({ ...t, selected: !allSelected }));
+                        setAnalysisResult({ ...analysisResult, extractedTopics: nextTopics });
+                        const selectedCount = nextTopics.filter(t => t.selected).length;
+                        onUpdateSettings({ ...settings, slideCount: Math.max(3, selectedCount) });
+                        const bulletPoints = nextTopics.filter(t => t.selected).map(t => `- ${t.title}: ${t.description}`).join("\n");
+                        setPrompt(`Slogan: ${analysisResult.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
+                      }}
+                      className="text-[10px] text-indigo-650 hover:underline font-extrabold"
+                    >
+                      {analysisResult.extractedTopics.every(t => t.selected) ? "Tout décocher" : "Tout cocher"}
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-[190px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 pr-1">
+                    {analysisResult.extractedTopics.map((topic) => (
+                      <label
+                        key={topic.id}
+                        className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          topic.selected
+                            ? 'bg-white border-indigo-300 shadow-xs ring-1 ring-indigo-300/10'
+                            : 'bg-slate-50/55 border-slate-200 opacity-60 hover:opacity-90'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={topic.selected}
+                          onChange={() => toggleTopic(topic.id)}
+                          className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0 leading-tight">
+                          <p className="text-[11.5px] font-extrabold text-slate-800 leading-none">{topic.title}</p>
+                          <p className="text-[9.5px] text-slate-500 mt-1 leading-normal font-medium">{topic.description}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="bg-slate-50/70 p-2.5 rounded-xl space-y-1.5 border border-slate-150 text-[10px]">
+                    {analysisResult.suggestedSlogan && (
+                      <div className="flex items-start gap-1 font-medium">
+                        <span className="font-extrabold text-indigo-950 shrink-0">Accroche phare :</span>
+                        <span className="italic text-slate-700">"{analysisResult.suggestedSlogan}"</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                      <span>Palette : <strong className="text-indigo-600">{analysisResult.suggestedVisualTheme}</strong></span>
+                      <span>Ton : <strong className="text-indigo-600">{analysisResult.suggestedTone}</strong></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 📝 Étape 2: Objectif Final & Consignes (Optionnel ou Pré-rempli) */}
             <div className="space-y-1.5 border-t border-slate-100 pt-3">
               <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-indigo-600" /> 2. Analyser un Site Web (Optionnel)
-              </label>
-              <div className="relative">
-                <input
-                  id="input-url"
-                  type="text"
-                  placeholder="ex: www.ma-marque-responsable.fr"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg py-2 pl-9 pr-3 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-sm"
-                />
-                <Link2 className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <p className="text-[9px] text-slate-400 leading-normal">
-                Notre serveur va inspecter l'adresse de votre site pour en extraire l'essence et le logo.
-              </p>
-            </div>
-
-            {/* 📝 Étape 3: Description ou Texte de Base */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-indigo-600" /> 3. Objectif de la Vidéo & Description
+                <FileText className="w-3.5 h-3.5 text-indigo-600" /> 2. Objectif de la Vidéo & Description du sujet
               </label>
               <textarea
                 id="input-prompt"
-                placeholder="Décrivez votre produit, vos services à mettre en avant ou copiez-collez l'accroche de votre campagne..."
+                placeholder="Rédigez ici ou laissez l'IA composer à partir des sujets du site web cochés ci-dessus..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
-                className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg p-2.5 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none resize-none leading-relaxed shadow-sm font-medium"
+                className="w-full bg-white border border-slate-200 text-slate-800 rounded-lg p-2.5 text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none resize-none leading-relaxed shadow-sm font-semibold"
               />
+              <p className="text-[9px] text-slate-400">
+                Vous n'avez pas besoin de rédiger : les thèmes se synchronisent automatiquement si vous avez analysé un site.
+              </p>
             </div>
 
             {/* Style de Script */}

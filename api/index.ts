@@ -172,7 +172,84 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// 1. Generate Storyboard / Script API
+// 1. Pre-analyze Website API to extract topics, platforms and matching metadata
+app.post("/api/analyze-website", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || url.trim().length < 3) {
+      return res.status(400).json({ error: "L'adresse URL du site web est requise pour l'analyse." });
+    }
+
+    console.log(`Pre-analyzing website: ${url}`);
+    const scrapeResult = await fetchAndAnalyzeUrl(url);
+    const ai = getGeminiClient();
+
+    const instruction = `
+You are a brilliant AI Growth Hacker and Creative Director.
+Your job is to analyze the scraped website content and extract high-converting topics/services that a short-form video could highlight.
+Also suggest the ideal visual theme, the ideal video platform, and a brand slogan.
+
+The extracted topics should focus on unique Selling Points, core services, or products of the company. Keep names of topics very punchy (2-4 words) and description to 1 sentence.
+Return a structured JSON payload adhering precisely to the schema.
+`;
+
+    const userMessage = `
+SCRAPED CONTENT FROM "${url}":
+"""
+${scrapeResult.context}
+"""
+URL domain or brand: "${url}"
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [
+        { text: instruction },
+        { text: userMessage }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            detectedTitle: { type: Type.STRING, description: "Highly polished title of the brand or web page" },
+            suggestedSlogan: { type: Type.STRING, description: "A punchy promotional slogan or hook" },
+            suggestedPlatform: { type: Type.STRING, description: "Ideal platform category: 'tiktok', 'instagram', or 'linkedin'" },
+            suggestedVisualTheme: { type: Type.STRING, description: "Matches: 'modern-dark', 'neon-pulse', 'warm-editorial', 'clean-corporate', or 'brutalist-yellow'" },
+            suggestedTone: { type: Type.STRING, description: "Matches: 'energetic marketing', 'educational explainer', or 'inspiring brand story'" },
+            extractedTopics: {
+              type: Type.ARRAY,
+              description: "Extracted 3 to 5 core services or feature topics found on the site",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING, description: "Unique URL safe ID, e.g. 'restaur-bois'" },
+                  title: { type: Type.STRING, description: "Punchy short name of service (e.g. 'Eco-Restauration')" },
+                  description: { type: Type.STRING, description: "Brief explanation of this service's importance" },
+                  selected: { type: Type.BOOLEAN, description: "Default true" }
+                },
+                required: ["id", "title", "description", "selected"]
+              }
+            }
+          },
+          required: ["detectedTitle", "suggestedSlogan", "suggestedPlatform", "suggestedVisualTheme", "suggestedTone", "extractedTopics"]
+        }
+      }
+    });
+
+    const parsedData = safeExtractJson(response.text?.trim() || "{}");
+    res.json({
+      ...parsedData,
+      scrapedLogoUrl: scrapeResult.logoUrl || ""
+    });
+  } catch (error: any) {
+    console.error("Website pre-analysis failed:", error);
+    res.status(500).json({ error: error.message || "Impossible d'analyser le site." });
+  }
+});
+
+// 2. Generate Storyboard / Script API
 app.post("/api/generate-storyboard", async (req, res) => {
   try {
     const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4 } = req.body;
