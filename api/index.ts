@@ -36,12 +36,13 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
       try {
         controller.abort();
       } catch (_) {}
-    }, 1400); // Strict 1.4 seconds timeout limit to leave ample budget for Gemini
-
+    }, 10000); // Increased to 10 seconds to allow stable DNS/SSL/Network handling
+ 
     const response = await fetch(formattedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Client/AuraMotion',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'fr,en-US;q=0.7,en;q=0.3',
       },
       signal: controller.signal,
     });
@@ -121,7 +122,7 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
       resolvedFavicon = `${new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`).origin}/favicon.ico`;
     } catch (_) {}
     return {
-      context: `[Scrape limit exceeded: ${error.message}]`,
+      context: `[Scrape limit exceeded or failed: ${error.message}]`,
       logoUrl: resolvedFavicon
     };
   }
@@ -189,7 +190,10 @@ You are a brilliant AI Growth Hacker and Creative Director.
 Your job is to analyze the scraped website content and extract high-converting topics/services that a short-form video could highlight.
 Also suggest the ideal visual theme, the ideal video platform, and a brand slogan.
 
-The extracted topics should focus on unique Selling Points, core services, or products of the company. Keep names of topics very punchy (2-4 words) and description to 1 sentence.
+IMPORTANT GRACEFUL FALLBACK RULE:
+If the scraped website content is unavailable, empty, or indicates a scrape failure or limit exceeded (e.g. contains "[Scrape limit exceeded or failed]" or "[HTTP Status...]"), DO NOT FAIL or return an empty result. Instead, study the URL, brand name, and domain extensions carefully (e.g. "le-grub.com" relates to food, catering, or culinary coworking/community/collaboration space). Use your vast industry and creative knowledge to guess and generate highly realistic, relevant, and extremely professional high-converting topic/service proposals and an excellent slogan matching that likely brand identity.
+
+All returned text and generated titles/services must be in French (to maximize local relevance). Keep names of topics very punchy (2-4 words) and description to 1 sentence.
 Return a structured JSON payload adhering precisely to the schema.
 `;
 

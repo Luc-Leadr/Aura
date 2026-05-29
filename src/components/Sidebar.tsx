@@ -80,7 +80,14 @@ export default function Sidebar({
         body: JSON.stringify({ url: url.trim() })
       });
       if (!response.ok) {
-        throw new Error("L'analyse du site a échoué. Vérifiez que l'URL est correcte et accessible.");
+        let errorMsg = "L'analyse du site a échoué. Vérifiez que l'URL est correcte et accessible.";
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            errorMsg = errData.error;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
       }
       const data = await response.json();
       if (data && data.extractedTopics) {
