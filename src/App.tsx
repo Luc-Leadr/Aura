@@ -51,6 +51,20 @@ export default function App() {
   const [exportFilename, setExportFilename] = useState("campagne-aura-motion.mp4");
   const [exportResolution, setExportResolution] = useState<'725p' | '1080p' | '4k'>('1080p');
 
+  const [scrapedBrand, setScrapedBrand] = useState<{
+    detectedTitle: string;
+    suggestedSlogan: string;
+    understandingSummary: string;
+    suggestedPlatform: string;
+    suggestedVisualTheme: string;
+    suggestedTone: string;
+    scrapedLogoUrl: string;
+    extractedTopics: Array<{ id: string; title: string; description: string }>;
+    primaryHeadings: string[];
+    secondaryHeadings: string[];
+    targetUrl?: string;
+  } | null>(null);
+
   const t = I18N_DICTS[language];
 
   const handleUpdateSettings = (newSettings: ProjectSettings) => {
@@ -181,6 +195,24 @@ export default function App() {
           },
           transition: scene.transition || "fade"
         }));
+
+        setScrapedBrand({
+          detectedTitle: project.settings.name || outcome.suggestedSlogan || "Ma Marque",
+          suggestedSlogan: outcome.suggestedSlogan || "",
+          understandingSummary: outcome.detectedTone || "",
+          suggestedPlatform: project.settings.platform || "tiktok",
+          suggestedTone: outcome.detectedTone || "",
+          suggestedVisualTheme: project.settings.visualTheme || "modern-dark",
+          scrapedLogoUrl: outcome.scrapedLogoUrl || "",
+          extractedTopics: outcome.scenes.map((s: any, idx: number) => ({
+            id: `topic-${idx}`,
+            title: s.visual?.title || "",
+            description: s.subtitle || ""
+          })),
+          primaryHeadings: outcome.primaryHeadings || [],
+          secondaryHeadings: outcome.secondaryHeadings || [],
+          targetUrl: payload.url
+        });
 
         const safeSlogan = typeof outcome.suggestedSlogan === 'string' ? outcome.suggestedSlogan : "";
         const safeTone = typeof outcome.detectedTone === 'string' ? outcome.detectedTone : "";
@@ -384,6 +416,7 @@ export default function App() {
             setProject(DEFAULT_PROJECT);
             setHasGenerated(true);
           }}
+          onAnalyzeWebsiteComplete={(data) => setScrapedBrand(data)}
         />
 
         {/* Center Section: Video Preview Canvas + Log alerts + Séquence timeline */}
@@ -466,6 +499,7 @@ export default function App() {
           }}
           onPolishWithAi={handlePolishWithAi}
           language={language}
+          scrapedBrand={scrapedBrand}
         />
       </div>
 

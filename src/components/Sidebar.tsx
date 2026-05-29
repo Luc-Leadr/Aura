@@ -37,6 +37,7 @@ interface SidebarProps {
   workingLanguage: 'fr' | 'en';
   setWorkingLanguage: (lang: 'fr' | 'en') => void;
   onLoadPresetDemo: () => void;
+  onAnalyzeWebsiteComplete?: (data: any) => void;
 }
 
 export default function Sidebar({
@@ -49,7 +50,8 @@ export default function Sidebar({
   setLanguage,
   workingLanguage,
   setWorkingLanguage,
-  onLoadPresetDemo
+  onLoadPresetDemo,
+  onAnalyzeWebsiteComplete
 }: SidebarProps) {
   const [prompt, setPrompt] = useState("");
   const [url, setUrl] = useState("");
@@ -122,6 +124,13 @@ export default function Sidebar({
             selected: true
           }))
         });
+
+        if (onAnalyzeWebsiteComplete) {
+          onAnalyzeWebsiteComplete({
+            ...data,
+            targetUrl: url.trim()
+          });
+        }
 
         // Push recommendations directly into active project settings
         const proposedPlatform = data.suggestedPlatform || 'instagram';

@@ -60,7 +60,7 @@ async function generateContentWithFallback(ai: any, params: any) {
 }
 
 // Combined fast single-fetch HTML helper to scrape context + logo in one go
-async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string; logoUrl: string }> {
+async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string; logoUrl: string; primaryHeadings: string[]; secondaryHeadings: string[] }> {
   let timeoutId: any = null;
   try {
     const formattedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
@@ -89,7 +89,9 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
       const origin = new URL(formattedUrl).origin;
       return { 
         context: `[HTTP Status ${response.status}]`, 
-        logoUrl: `${origin}/favicon.ico` 
+        logoUrl: `${origin}/favicon.ico`,
+        primaryHeadings: [],
+        secondaryHeadings: []
       };
     }
     
@@ -165,7 +167,9 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
     
     return {
       context: contextText,
-      logoUrl: logoUrl
+      logoUrl: logoUrl,
+      primaryHeadings: h1s,
+      secondaryHeadings: h2s
     };
   } catch (error: any) {
     if (timeoutId) {
@@ -178,7 +182,9 @@ async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string;
     } catch (_) {}
     return {
       context: `[Scrape limit exceeded or failed: ${error.message}]`,
-      logoUrl: resolvedFavicon
+      logoUrl: resolvedFavicon,
+      primaryHeadings: [],
+      secondaryHeadings: []
     };
   }
 }
@@ -231,12 +237,15 @@ app.get("/api/health", (req, res) => {
 // 1. Pre-analyze Website API to extract topics, platforms and matching metadata
 app.post("/api/analyze-website", async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, language } = req.body;
     if (!url || url.trim().length < 3) {
       return res.status(400).json({ error: "L'adresse URL du site web est requise pour l'analyse." });
     }
 
-    console.log(`Pre-analyzing website: ${url}`);
+    const targetLanguage = language === "en" ? "en" : "fr";
+    const targetLangLabel = targetLanguage === "en" ? "English" : "French";
+
+    console.log(`Pre-analyzing website (Language: ${targetLangLabel}): ${url}`);
     const scrapeResult = await fetchAndAnalyzeUrl(url);
     const ai = getGeminiClient();
 
@@ -248,7 +257,7 @@ Also suggest the ideal visual theme, the ideal video platform, and a brand sloga
 IMPORTANT GRACEFUL FALLBACK RULE:
 If the scraped website content is unavailable, empty, or indicates a scrape failure or limit exceeded (e.g. contains "[Scrape limit exceeded or failed]" or "[HTTP Status...]"), DO NOT FAIL or return an empty result. Instead, study the URL, brand name, and domain extensions carefully (e.g. "le-grub.com" relates to food, catering, or culinary coworking/community/collaboration space). Use your vast industry and creative knowledge to guess and generate highly realistic, relevant, and extremely professional high-converting topic/service proposals and an excellent slogan matching that likely brand identity.
 
-All returned text and generated titles/services must be in French (to maximize local relevance). Keep names of topics very punchy (2-4 words) and description to 1 sentence.
+All returned text and generated titles/services MUST be drafted entirely in ${targetLangLabel} (avoid mixing languages). Keep names of topics very punchy (2-4 words) and description to 1 sentence.
 Return a structured JSON payload adhering precisely to the schema.
 `;
 
@@ -274,7 +283,7 @@ URL domain or brand: "${url}"
           properties: {
             detectedTitle: { type: Type.STRING, description: "Highly polished title of the brand or web page" },
             suggestedSlogan: { type: Type.STRING, description: "A punchy promotional slogan or hook" },
-            understandingSummary: { type: Type.STRING, description: "A professional and elegant summary in French (1 or 2 sentences max) showing a clear understanding of the website's brand identity, audience, and key value propositions." },
+            understandingSummary: { type: Type.STRING, description: "A professional and elegant summary in " + targetLangLabel + " (1 or 2 sentences max) showing a clear understanding of the website's brand identity, audience, and key value propositions." },
             suggestedPlatform: { type: Type.STRING, description: "Ideal platform category: 'tiktok', 'instagram', or 'linkedin'" },
             suggestedVisualTheme: { type: Type.STRING, description: "Matches: 'modern-dark', 'neon-pulse', 'warm-editorial', 'clean-corporate', or 'brutalist-yellow'" },
             suggestedTone: { type: Type.STRING, description: "Matches: 'energetic marketing', 'educational explainer', or 'inspiring brand story'" },
@@ -301,7 +310,9 @@ URL domain or brand: "${url}"
     const parsedData = safeExtractJson(response.text?.trim() || "{}");
     res.json({
       ...parsedData,
-      scrapedLogoUrl: scrapeResult.logoUrl || ""
+      scrapedLogoUrl: scrapeResult.logoUrl || "",
+      primaryHeadings: scrapeResult.primaryHeadings || [],
+      secondaryHeadings: scrapeResult.secondaryHeadings || []
     });
   } catch (error: any) {
     console.error("Website pre-analysis failed:", error);
@@ -312,11 +323,13 @@ URL domain or brand: "${url}"
 // 2. Generate Storyboard / Script API
 app.post("/api/generate-storyboard", async (req, res) => {
   try {
-    const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4 } = req.body;
+    const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4, workingLanguage = "fr" } = req.body;
     const ai = getGeminiClient();
 
     let scrapedContext = "";
     let scrapedLogoUrl = "";
+    let primaryHeadings: string[] = [];
+    let secondaryHeadings: string[] = [];
 
     // OPTIMIZATION: Check if prompt already contains pre-analyzed metadata or slogan details
     const isAlreadyScraped = prompt && (prompt.includes("Thèmes") || prompt.includes("Slogan:") || prompt.length > 120);
@@ -327,6 +340,8 @@ app.post("/api/generate-storyboard", async (req, res) => {
         const result = await fetchAndAnalyzeUrl(url);
         scrapedContext = result.context;
         scrapedLogoUrl = result.logoUrl;
+        primaryHeadings = result.primaryHeadings || [];
+        secondaryHeadings = result.secondaryHeadings || [];
       } catch (err: any) {
         console.error("Scraping details failed inside generate-storyboard:", err.message);
       }
@@ -335,22 +350,26 @@ app.post("/api/generate-storyboard", async (req, res) => {
     }
 
     const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
+    const targetLangLabel = workingLanguage === "en" ? "English" : "French";
 
     // Construct guidance for the script - ultra clean & lightweight for Vercel Hobby stability (speed)
     const instruction = `
 You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context) and generate a highly engaging, high-conversion short-form video storyboard/script.
 
+CRITICAL LANGUAGE RULE:
+The entire generated output - including all scene titles, scene subtitles, campaign slogan ('suggestedSlogan'), and speakable voiceover descriptions (the 'subtitle' property of each scene) MUST be written completely and fluently in ${targetLangLabel}. Do NOT mix English and French.
+
 The output will be used to animate a video preview timeline.
 Generate exactly ${slideCount} highly polished distinct scenes/slides corresponding to the core services, product benefits, or brand features of the user's business. Keep titles and descriptions extremely concise to optimize loading performance.
 Each scene duration should be exactly ${calculatedDuration} seconds.
-The tone of voice config should match the theme and tone of the requested vibe: "${scriptVibe || 'energentic marketing'}".
+The tone of voice config should match the theme and tone of the requested vibe: "${scriptVibe || 'energetic marketing'}".
 Brand/Theme request: "${visualTheme || 'modern-dark'}".
 
 Each scene needs:
-- A spoken narrator subtitle (between 8 and 15 words per scene, fluid, hooky, and punchy).
+- A spoken narrator subtitle (between 8 and 15 words per scene, fluid, hooky, and punchy, written in ${targetLangLabel}).
 - A corresponding visual layout guide:
-  - 'title': A short punchy text to render in large bold display typography.
-  - 'subtitle': Optional secondary contextual text.
+  - 'title': A short punchy text to render in large bold display typography (in ${targetLangLabel}, 2-4 words max).
+  - 'subtitle': Optional secondary contextual text (in ${targetLangLabel}).
   - 'accentWord': One specific word in the title/subtitle to highlight visually with a special accent color.
   - 'backgroundColor': Tailored to the theme context. Must be a beautiful Tailwind CSS linear gradient format using exactly three classes: an initial gradient direction (e.g., 'bg-gradient-to-br'), a 'from-[color]', and a 'to-[color]' (e.g., "bg-gradient-to-br from-indigo-950 to-slate-900", or "bg-gradient-to-b from-yellow-500 to-amber-600"). Avoid bland single solid colors.
   - 'backgroundType': Choose 'gradient' or 'solid'.
@@ -448,7 +467,9 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
     // Inject brand logo and colors dynamically so client receives them automatically
     res.json({
       ...parsedData,
-      scrapedLogoUrl: scrapedLogoUrl || ""
+      scrapedLogoUrl: scrapedLogoUrl || "",
+      primaryHeadings: primaryHeadings,
+      secondaryHeadings: secondaryHeadings
     });
   } catch (error: any) {
     console.error("Storyboard generation error:", error);
@@ -516,17 +537,24 @@ app.post("/api/generate-scene-asset", async (req, res) => {
 // 4. AI Copywriting Script polisher
 app.post("/api/polish-scene", async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, language, workingLanguage } = req.body;
     if (!text || text.trim().length === 0) {
       return res.status(400).json({ error: "Text is required to polish." });
     }
 
+    const targetLanguage = language || workingLanguage || "fr";
+    const targetLangLabel = targetLanguage === "en" ? "English" : "French";
+
     const ai = getGeminiClient();
-    console.log(`Polishing narrative script for scene: "${text.substring(0, 30)}..."`);
+    console.log(`Polishing narrative script for scene (Language: ${targetLangLabel}): "${text.substring(0, 30)}..."`);
 
     const instruction = `
 You are a brilliant marketing copywriter specializing in micro-content and TikTok shorts.
-Your task is to take the provided sentence (usually in French) and rewrite it to make it more impactful, punchy, persuasive, and optimized for voiceover.
+Your task is to take the provided sentence and rewrite it to make it more impactful, punchy, persuasive, and optimized for voiceover.
+
+CRITICAL LANGUAGE RULE:
+The polished sentence MUST be written completely and fluently in ${targetLangLabel}. Do NOT change languages. If the input is in one language but the target is ${targetLangLabel}, translate and polish it as needed.
+
 Keep it concise (maximum 18 words) and extremely natural to listen to.
 Do not wrap in quotes or add metadata. Output only the refined sentence.
 `;

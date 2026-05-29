@@ -12,7 +12,9 @@ import {
   Plus,
   Palette,
   Eye,
-  Type as FontIcon
+  Type as FontIcon,
+  Sparkles,
+  Globe
 } from "lucide-react";
 import { Scene, VisualConfig, AudioConfig, TextPosition, TextStyle, AnimationType } from "../types";
 import { VISUAL_THEMES, FONTS, ROYALTY_FREE_TRACKS, I18N_DICTS } from "../constants";
@@ -22,13 +24,27 @@ interface ControlPanelProps {
   onChangeScene: (s: Scene) => void;
   onPolishWithAi: (text: string) => Promise<string>;
   language: 'fr' | 'en';
+  scrapedBrand?: {
+    detectedTitle: string;
+    suggestedSlogan: string;
+    understandingSummary: string;
+    suggestedPlatform: string;
+    suggestedVisualTheme: string;
+    suggestedTone: string;
+    scrapedLogoUrl: string;
+    extractedTopics: Array<{ id: string; title: string; description: string }>;
+    primaryHeadings: string[];
+    secondaryHeadings: string[];
+    targetUrl?: string;
+  } | null;
 }
 
 export default function ControlPanel({
   scene,
   onChangeScene,
   onPolishWithAi,
-  language
+  language,
+  scrapedBrand
 }: ControlPanelProps) {
   const [isPolishing, setIsPolishing] = useState(false);
   const t = I18N_DICTS[language || 'fr'];
@@ -104,8 +120,179 @@ export default function ControlPanel({
       </div>
 
       {/* Control Elements Scroll wrapper */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 bg-white">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 bg-white animate-in fade-in duration-200">
         
+        {/* Brand Alignment and Website Scanner Matcher */}
+        <div id="scraped-brand-alignment" className="bg-gradient-to-br from-indigo-50/70 to-slate-50 border border-slate-205 rounded-2xl p-4 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] bg-indigo-100 border border-indigo-200/60 text-indigo-805 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 font-mono">
+              <Sparkles className="w-3 h-3 text-indigo-650 animate-pulse" />
+              {language === 'fr' ? 'Harmonisation Site Web' : 'Website Alignment'}
+            </span>
+            {scrapedBrand?.targetUrl && (
+              <span className="text-[9.5px] text-indigo-650 font-bold truncate max-w-[130px] flex items-center gap-0.5 font-mono">
+                <Globe className="w-3 h-3 text-indigo-500" />
+                {scrapedBrand.targetUrl}
+              </span>
+            )}
+          </div>
+
+          {/* If no scraped brand exists yet, let them understand the magic */}
+          {!scrapedBrand ? (
+            <div className="space-y-1.5 pt-0.5">
+              <p className="text-[10px] text-slate-500 leading-relaxed font-semibold">
+                {language === 'fr'
+                  ? "Saisissez l'adresse de votre site web dans l'onglet de gauche puis cliquez sur Analyser. Votre inspecteur de clips affichera automatiquement vos couleurs, images de fond, pistes audio, slogans et vos propres textes clés scannés !"
+                  : "Analyze your webpage in the left options tab. The live canvas editor will automatically map custom background gradients, brand imagery, soundtracks, and display real structural texts compiled directly from your page nodes."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3.5 pt-0.5">
+              {/* Logo and Brand Name metadata inline */}
+              <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-150 shadow-xs">
+                {scrapedBrand.scrapedLogoUrl ? (
+                  <img
+                    src={scrapedBrand.scrapedLogoUrl}
+                    alt="Scraped Brand Logo"
+                    referrerPolicy="no-referrer"
+                    className="w-7 h-7 object-contain bg-slate-50 rounded p-0.5 border border-slate-150 flex-shrink-0"
+                    onError={(e) => {
+                      (e.target as any).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="w-7 h-7 bg-indigo-100 rounded text-indigo-600 font-bold text-[10px] flex items-center justify-center font-mono">
+                    Aa
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10.5px] font-black text-slate-800 truncate leading-tight">{scrapedBrand.detectedTitle}</p>
+                  <p className="text-[8px] text-indigo-655 font-bold uppercase tracking-tight truncate leading-none mt-0.5">{scrapedBrand.suggestedTone || "Commercial"}</p>
+                </div>
+              </div>
+
+              {/* Slogan proposal */}
+              {scrapedBrand.suggestedSlogan && (
+                <div className="space-y-1">
+                  <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">
+                    {language === 'fr' ? "💡 Accroche publicitaire suggérée" : "💡 Suggested slogan hook"}
+                  </span>
+                  <div className="flex gap-1.5 items-center">
+                    <div className="flex-1 bg-white border border-slate-150 p-2 rounded-lg text-[10px] font-bold text-slate-700 italic leading-snug">
+                      "{scrapedBrand.suggestedSlogan}"
+                    </div>
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => updateVisual('title', scrapedBrand.suggestedSlogan)}
+                        className="text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded transition shadow-xs cursor-pointer text-center"
+                        title={language === 'fr' ? "Appliquer comme titre" : "Apply as Title"}
+                      >
+                        Titre
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateVisual('subtitle', scrapedBrand.suggestedSlogan)}
+                        className="text-[9px] bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold px-1.5 py-1 rounded transition border border-slate-300 shadow-xs cursor-pointer text-center"
+                        title={language === 'fr' ? "Appliquer comme sous-titre" : "Apply as Subtitle"}
+                      >
+                        Accr.
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Scraped Website Headings Tagline Suggestions (Crucial highlight) */}
+              {((scrapedBrand.primaryHeadings && scrapedBrand.primaryHeadings.length > 0) || 
+                (scrapedBrand.secondaryHeadings && scrapedBrand.secondaryHeadings.length > 0)) && (
+                <div className="space-y-1.5">
+                  <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider font-mono block">
+                    {language === 'fr' ? "🏷️ Textes et Balises clé du site analysé" : "🏷️ Live website crawled headings"}
+                  </span>
+                  <div className="max-h-32 overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-slate-205">
+                    {[...(scrapedBrand.primaryHeadings || []), ...(scrapedBrand.secondaryHeadings || [])]
+                      .filter((text, idx, arr) => text && text.trim().length > 3 && arr.indexOf(text) === idx)
+                      .slice(0, 8)
+                      .map((textStr, idx) => (
+                        <div key={idx} className="group flex items-center justify-between text-[9px] bg-white border border-slate-150 p-1.5 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 transition">
+                          <span className="truncate max-w-[165px] text-slate-800" title={textStr}>{textStr}</span>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateVisual('title', textStr);
+                                // Set visual accentWord as the first word of heading to align nicely
+                                const words = textStr.split(' ');
+                                if (words.length > 0) {
+                                  updateVisual('accentWord', words[0]);
+                                }
+                              }}
+                              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-1 py-0.5 rounded text-[8px]"
+                              title={language === 'fr' ? "Remplacer le titre du clip" : "Apply as slide title"}
+                            >
+                              Titre
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateVisual('subtitle', textStr)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-1 py-0.5 rounded text-[8px]"
+                              title={language === 'fr' ? "Remplacer l'accroche de sous-titre" : "Apply as slide subtitle"}
+                            >
+                              Accr.
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Generated brand gradient proposals */}
+              <div className="space-y-1.5">
+                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider font-mono block font-bold">
+                  {language === 'fr' ? "🎨 Nuancier et dégradés intelligents" : "🎨 AI generated brand palettes"}
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { name: "Blue Slate", value: "bg-gradient-to-br from-[#0c0f1e] via-[#12182d] to-[#1a233d]" },
+                    { name: "Deep Royal", value: "bg-gradient-to-br from-[#120b29] via-[#1a113a] to-[#25184f]" },
+                    { name: "Emerald Tech", value: "bg-gradient-to-br from-[#071715] via-[#0b2421] to-[#143d38]" },
+                    { name: "Calm Amber", value: "bg-gradient-to-br from-[#1a110c] via-[#2d1b13] to-[#3a2217]" },
+                  ].map((grad, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        updateVisual('backgroundType', 'gradient');
+                        updateVisual('backgroundColor', grad.value);
+                      }}
+                      className={`flex items-center gap-1.5 bg-white border border-slate-200 rounded p-1 hover:bg-slate-50 transition text-left cursor-pointer ${
+                        scene.visual.backgroundColor === grad.value ? 'ring-1 ring-indigo-500 border-indigo-300' : ''
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full flex-shrink-0 ${grad.value} border border-slate-200`} />
+                      <span className="text-[8px] font-extrabold text-slate-600 truncate">{grad.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Helpful informative notice */}
+              <div className="text-[8.5px] bg-indigo-50/50 text-indigo-900 p-2.5 rounded-xl border border-indigo-100 flex items-start gap-1 font-semibold leading-relaxed">
+                <span className="text-[10px] text-indigo-750">💡</span>
+                <p>
+                  {language === 'fr' 
+                    ? "Besoin d'un rendu hautement dynamique comme 1600.agency ? Combinez ces textes réels avec l'animation 'Balayage Masque' (Reveal) ou 'Dérive' (Drift) ci-dessous, et le style 'Impact' ou 'Cyberpunk' !"
+                    : "Want highly dynamic outputs inspired by premium agencies ? Combine these organic texts with 'Reveal' or 'Drift' animations, and 'Impact' heavy caps text styling in the settings below!"
+                  }
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Subtitle Voice-Over text narrative editor */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
