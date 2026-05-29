@@ -254,8 +254,18 @@ You are a brilliant AI Growth Hacker and Creative Director.
 Your job is to analyze the scraped website content and extract high-converting topics/services that a short-form video could highlight.
 Also suggest the ideal visual theme, the ideal video platform, and a brand slogan.
 
+CRITICAL TRUTH & DETAILS RULE (STRICTLY AVOID AI SLOP):
+- You are STRICTLY FORBIDDEN from generating generic marketing clichés or filler terms such as "Expertise sur mesure", "Votre Vitrine", "Gagner du temps", "Passez à l'action", "Boostez votre visibilité", "Partenaire idéal", or other generic filler copy.
+- Instead, you MUST study the text carefully to extract EXACT, highly specific features, real utility tools, or concrete concepts described on the site (for example, if the site is a tool like Talk&Post for LinkedIn writing, extract precise feature names like "Écriture Ghostwriting", "Calendrier de Publication", "Planificateur LinkedIn", "Statistiques & Portée", "Optimisation de Profil").
+- If the website analysis fails or context is sparse, examine the URL carefully. For example, a URL containing "talkandpost" is clearly a software product for LinkedIn, ghostwriting, and scheduling posts. Use this specific product understanding to propose genuine matching tools ("Planification LinkedIn", "Éditeur Ghostwriting") rather than generic business jargon.
+
+VISUAL THEME DETECTION ASSISTANCE:
+- If the website references high-end photography, luxury, premium portfolios, motion design studios, minimalist black/white contrast, or pure raw designs (such as a black and white portfolio like Talk&Post or 1600.agency, or tech tools aiming for extreme focus), you MUST suggest 'stark-monochrome' as the 'suggestedVisualTheme'.
+- If the website is highly formal or professional (SaaS, real estate, B2B, consulting), suggest 'clean-corporate' or 'warm-editorial'.
+- Avoid suggesting flashy neon colors ('neon-pulse') or bright yellow ('brutalist-yellow') unless the source text explicitly highlights neon designs, pop-art themes, or high-octane startup vibes.
+
 IMPORTANT GRACEFUL FALLBACK RULE:
-If the scraped website content is unavailable, empty, or indicates a scrape failure or limit exceeded (e.g. contains "[Scrape limit exceeded or failed]" or "[HTTP Status...]"), DO NOT FAIL or return an empty result. Instead, study the URL, brand name, and domain extensions carefully (e.g. "le-grub.com" relates to food, catering, or culinary coworking/community/collaboration space). Use your vast industry and creative knowledge to guess and generate highly realistic, relevant, and extremely professional high-converting topic/service proposals and an excellent slogan matching that likely brand identity.
+If the scraped website content is unavailable, empty, or indicates a scrape failure or limit exceeded (e.g. contains "[Scrape limit exceeded or failed]" or "[HTTP Status...]"), DO NOT FAIL or return an empty result. Instead, study the URL, brand name, and domain extensions carefully (e.g. "le-grub.com" relates to culinary coworking or food-based brand; "talkandpost.bemotion.tv" is a beautiful black-and-white LinkedIn scheduling & ghostwriting tool). Use your vast industry and creative knowledge to guess and generate highly realistic, relevant, and extremely professional high-converting topic/service proposals and an excellent slogan matching that likely brand identity.
 
 All returned text and generated titles/services MUST be drafted entirely in ${targetLangLabel} (avoid mixing languages). Keep names of topics very punchy (2-4 words) and description to 1 sentence.
 Return a structured JSON payload adhering precisely to the schema.
@@ -285,7 +295,7 @@ URL domain or brand: "${url}"
             suggestedSlogan: { type: Type.STRING, description: "A punchy promotional slogan or hook" },
             understandingSummary: { type: Type.STRING, description: "A professional and elegant summary in " + targetLangLabel + " (1 or 2 sentences max) showing a clear understanding of the website's brand identity, audience, and key value propositions." },
             suggestedPlatform: { type: Type.STRING, description: "Ideal platform category: 'tiktok', 'instagram', or 'linkedin'" },
-            suggestedVisualTheme: { type: Type.STRING, description: "Matches: 'modern-dark', 'neon-pulse', 'warm-editorial', 'clean-corporate', or 'brutalist-yellow'" },
+            suggestedVisualTheme: { type: Type.STRING, description: "Matches precisely one of: 'stark-monochrome', 'modern-dark', 'neon-pulse', 'warm-editorial', 'clean-corporate', or 'brutalist-yellow'" },
             suggestedTone: { type: Type.STRING, description: "Matches: 'energetic marketing', 'educational explainer', or 'inspiring brand story'" },
             extractedTopics: {
               type: Type.ARRAY,
@@ -351,10 +361,18 @@ app.post("/api/generate-storyboard", async (req, res) => {
 
     const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
     const targetLangLabel = workingLanguage === "en" ? "English" : "French";
-
-    // Construct guidance for the script - ultra clean & lightweight for Vercel Hobby stability (speed)
     const instruction = `
-You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context) and generate a highly engaging, high-conversion short-form video storyboard/script.
+You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context/headings) and generate a highly engaging, high-conversion short-form video storyboard/script.
+
+CRITICAL BRAND ALIGNMENT & THEME HONESTY:
+- You are STRICTLY FORBIDDEN from generating generic marketing clichés like "Expertise Sur Mesure", "Votre Vitrine", "Boostez vos ventes", "Votre Partenaire", "Solutions Innovantes", "LINKEDIN VOTRE VITRINE ???", "DÉCOUVREZ NOTRE SITE", "GAGNEZ DU TEMPS", "ACCÉLÉREZ VOTRE SUCCÈS" or other generic filler copy. This is low-quality AI slop.
+- Instead, you MUST study the provided headings and scraped context carefully. Capture the EXACT specific technical services, products, functional names, or core feature modules described in the crawled content (for example, if analyzing a LinkedIn writing tool like Talk&Post, use terms like "Éditeur Ghostwriting", "Planification de Posts", "Calendrier Éditorial", "Statistiques & Portée", instead of generic phrases).
+- Build the slide 'title' (2-4 words max) and slide 'subtitle' directly using key terms, structural page headers, or quotes from the scanned website context and headings.
+
+STARK VISUAL CODE ENFORCEMENT:
+- If the visual theme requested is "stark-monochrome", you must STRICTLY output clean black/white/dark grayscale coordinates. The 'backgroundColor' MUST be an elegant black gradient/solid such as "bg-gradient-to-b from-[#0f0f12] via-[#09090a] to-[#020202]", "bg-[#0c0c0e]" or similar deep black/charcoal solid. Do NOT output colorful or vibrant highlights (no purple, yellow, rose, etc.). 
+- The scene's 'textStyle' for stark-monochrome should default to 'minimal' or 'impact' to maintain pristine visual typography.
+- For stark-monochrome, the 'accentWord' must still identify a key word to highlight, but keep background and other visuals entirely void of colors.
 
 CRITICAL LANGUAGE RULE:
 The entire generated output - including all scene titles, scene subtitles, campaign slogan ('suggestedSlogan'), and speakable voiceover descriptions (the 'subtitle' property of each scene) MUST be written completely and fluently in ${targetLangLabel}. Do NOT mix English and French.
@@ -371,7 +389,7 @@ Each scene needs:
   - 'title': A short punchy text to render in large bold display typography (in ${targetLangLabel}, 2-4 words max).
   - 'subtitle': Optional secondary contextual text (in ${targetLangLabel}).
   - 'accentWord': One specific word in the title/subtitle to highlight visually with a special accent color.
-  - 'backgroundColor': Tailored to the theme context. Must be a beautiful Tailwind CSS linear gradient format using exactly three classes: an initial gradient direction (e.g., 'bg-gradient-to-br'), a 'from-[color]', and a 'to-[color]' (e.g., "bg-gradient-to-br from-indigo-950 to-slate-900", or "bg-gradient-to-b from-yellow-500 to-amber-600"). Avoid bland single solid colors.
+  - 'backgroundColor': Tailored to the theme context. If theme is stark-monochrome, must be black or dark charcoal. Otherwise, standard gradients matching the theme.
   - 'backgroundType': Choose 'gradient' or 'solid'.
   - 'textPosition': Choose 'center', 'bottom', 'top', 'middle-left', or 'middle-right'.
   - 'textStyle': styling vibe of the text. Choose from 'minimal', 'impact' (heavy caps), 'bordered', 'cyber' (neon accents), 'serif' (elegant), or 'duotone'.
@@ -387,6 +405,10 @@ SCRAPED WEBSITE MATERIALS (if any):
 """
 ${scrapedContext}
 """
+EXACT DETECTED HEADINGS FROM WEBSITE:
+Primary Headings (H1): ${JSON.stringify(primaryHeadings)}
+Secondary Headings (H2): ${JSON.stringify(secondaryHeadings)}
+
 URL domain or brand: "${url || 'No URL supplied'}"
 Target Aspect Ratio: "${aspectRatio || '9:16'}"
 Chosen Style Palette: "${visualTheme || 'modern-dark'}"

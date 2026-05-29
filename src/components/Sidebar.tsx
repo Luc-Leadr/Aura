@@ -153,8 +153,8 @@ export default function Sidebar({
             backgroundColor: selectedThemePreset.bgGradient,
             backgroundType: "gradient",
             textPosition: "center",
-            textStyle: "bordered",
-            animationType: "drift",
+            textStyle: suggestedThemeId === "stark-monochrome" ? "impact" : "bordered",
+            animationType: suggestedThemeId === "stark-monochrome" ? "reveal" : "drift",
             assetKeywords: topic.title || "abstract minimalist",
             fontFamily: selectedThemePreset.font || "inter",
             customAccentColor: ""

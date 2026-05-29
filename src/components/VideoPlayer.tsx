@@ -257,17 +257,24 @@ export default function VideoPlayer({
 
   // Map text style variants
   const getTextStyleClasses = (style: string) => {
+    const isMonochrome = project.settings.visualTheme === 'stark-monochrome';
     switch (style) {
       case 'impact':
         return "font-black tracking-tighter uppercase text-3xl md:text-4xl text-neutral-50 drop-shadow-md";
       case 'bordered':
         return "font-extrabold tracking-tight text-3xl border-y border-white/20 py-3 text-white drop-shadow-sm";
       case 'cyber':
-        return "font-mono font-bold tracking-tight text-2xl text-fuchsia-400 drop-shadow-[0_0_12px_rgba(232,121,249,0.4)]";
+        return isMonochrome
+          ? "font-mono font-bold tracking-tight text-2xl text-white border-2 border-white/30 px-3 py-1 bg-white/5 uppercase"
+          : "font-mono font-bold tracking-tight text-2xl text-fuchsia-400 drop-shadow-[0_0_12px_rgba(232,121,249,0.4)]";
       case 'serif':
-        return "font-serif italic tracking-wide text-2xl text-amber-105 drop-shadow-lg";
+        return isMonochrome
+          ? "font-serif italic tracking-wide text-2xl text-white"
+          : "font-serif italic tracking-wide text-2xl text-amber-100 drop-shadow-lg";
       case 'duotone':
-        return "font-sans font-black tracking-tight text-3xl text-slate-200 bg-clip-text bg-gradient-to-r from-violet-200 to-indigo-100";
+        return isMonochrome
+          ? "font-sans font-black tracking-tight text-3xl text-slate-100 bg-clip-text bg-gradient-to-r from-white to-neutral-400 text-transparent"
+          : "font-sans font-black tracking-tight text-3xl text-slate-200 bg-clip-text bg-gradient-to-r from-violet-200 to-indigo-100";
       case 'minimal':
       default:
         return "font-sans font-medium tracking-normal text-2xl text-slate-100";
@@ -318,13 +325,31 @@ export default function VideoPlayer({
           if (!part) return null;
           const isAccent = part.toLowerCase() === accent.toLowerCase();
           if (isAccent) {
-            // Apply hex override style if defined, else fallback to standard gorgeous gradient
-            const inlineOverrideStyle = customAccentColor 
+            let standardClasses = "";
+            let inlineOverrideStyle = customAccentColor 
               ? { color: customAccentColor, borderBottomColor: customAccentColor } 
               : {};
-            const standardClasses = customAccentColor
-              ? "border-b-2 font-black relative px-1 mx-0.5"
-              : "font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-fuchsia-400 border-b-2 border-fuchsia-500/40 relative px-1 mx-0.5 rounded";
+
+            if (customAccentColor) {
+              standardClasses = "border-b-2 font-black relative px-1 mx-0.5";
+            } else {
+              // Dynamically select theme presets in harmony with brand codes
+              const currentThemeId = project.settings.visualTheme;
+              if (currentThemeId === 'stark-monochrome') {
+                standardClasses = "font-black text-white border-b-2 border-white bg-white/10 px-1.5 py-0.5 mx-0.5 rounded";
+              } else if (currentThemeId === 'modern-dark') {
+                standardClasses = "font-black text-emerald-400 border-b-2 border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 mx-0.5 rounded";
+              } else if (currentThemeId === 'warm-editorial') {
+                standardClasses = "font-serif italic text-amber-300 border-b border-amber-500/40 bg-amber-500/5 px-1.5 py-0.5 mx-0.5 rounded";
+              } else if (currentThemeId === 'clean-corporate') {
+                standardClasses = "font-black text-sky-450 border-b-2 border-sky-400/20 bg-sky-500/5 px-1.5 py-0.5 mx-0.5 rounded";
+              } else if (currentThemeId === 'brutalist-yellow') {
+                standardClasses = "font-mono font-black text-red-650 bg-red-500/10 border-2 border-red-600 px-1.5 py-0.5 mx-0.5 uppercase";
+              } else {
+                // Keep energetic colorful glow only for neon-pulse or sunset-glow
+                standardClasses = "font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-fuchsia-400 border-b-2 border-fuchsia-500/40 relative px-1 mx-0.5 rounded";
+              }
+            }
 
             return (
               <span 
@@ -468,8 +493,12 @@ export default function VideoPlayer({
                 )}
                 {/* Ambient Animated Particles / Circles for Motion visual */}
                 <div className="absolute inset-0 mix-blend-overlay opacity-30 z-0 overflow-hidden pointer-events-none">
-                  <div className="absolute -top-12 -left-12 w-48 h-48 rounded-full bg-indigo-500/40 filter blur-3xl" />
-                  <div className="absolute -bottom-16 -right-16 w-52 h-52 rounded-full bg-violet-600/40 filter blur-3xl" />
+                  <div className={`absolute -top-12 -left-12 w-48 h-48 rounded-full filter blur-3xl ${
+                    project.settings.visualTheme === 'stark-monochrome' ? 'bg-white/10' : 'bg-indigo-500/40'
+                  }`} />
+                  <div className={`absolute -bottom-16 -right-16 w-52 h-52 rounded-full filter blur-3xl ${
+                    project.settings.visualTheme === 'stark-monochrome' ? 'bg-neutral-500/10' : 'bg-violet-600/40'
+                  }`} />
                 </div>
               </div>
 
@@ -484,7 +513,9 @@ export default function VideoPlayer({
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      project.settings.visualTheme === 'stark-monochrome' ? 'bg-white' : 'bg-indigo-500'
+                    }`} />
                   )}
                   <span className="text-[8px] font-mono font-bold text-white/80 tracking-widest uppercase truncate">
                     {project.settings.name}
@@ -538,12 +569,16 @@ export default function VideoPlayer({
                         initial={{ opacity: 0, scale: 0.8, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        className="bg-black/85 backdrop-blur-md text-white text-[9px] font-semibold py-1.5 px-3 rounded-2xl rounded-tr-none border border-indigo-550/35 max-w-[150px] leading-snug shadow-2xl text-left"
+                        className={`bg-black/85 backdrop-blur-md text-white text-[9px] font-semibold py-1.5 px-3 rounded-2xl rounded-tr-none border max-w-[150px] leading-snug shadow-2xl text-left ${
+                          project.settings.visualTheme === 'stark-monochrome' ? 'border-white/20' : 'border-indigo-550/35'
+                        }`}
                       >
                         <p className="line-clamp-2 italic">
                           &ldquo;{currentScene?.subtitle.split(' ').slice(0, 8).join(' ') || "..."}...&rdquo;
                         </p>
-                        <span className="text-[6.5px] uppercase font-bold text-indigo-400 mt-1 block tracking-wider">
+                        <span className={`text-[6.5px] uppercase font-bold mt-1 block tracking-wider ${
+                          project.settings.visualTheme === 'stark-monochrome' ? 'text-white' : 'text-indigo-400'
+                        }`}>
                           {language === 'fr' ? '• Parole Active' : '• Active Speech'}
                         </span>
                       </motion.div>
@@ -552,7 +587,11 @@ export default function VideoPlayer({
                     <div className="flex flex-col items-center">
                       <div className="relative">
                         <motion.div 
-                          className="absolute -inset-1 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"
+                          className={`absolute -inset-1 rounded-full ${
+                            project.settings.visualTheme === 'stark-monochrome'
+                              ? 'bg-gradient-to-tr from-neutral-600 via-neutral-300 to-white'
+                              : 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500'
+                          }`}
                           animate={isPlaying ? { rotate: 360, scale: [1, 1.1, 1] } : {}}
                           transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                         />

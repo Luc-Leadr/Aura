@@ -13,6 +13,16 @@ export interface VisualThemePreset {
 
 export const VISUAL_THEMES: VisualThemePreset[] = [
   {
+    id: "stark-monochrome",
+    name: "Minimal Stark (Noir & Blanc)",
+    className: "theme-stark-monochrome",
+    bgGradient: "bg-gradient-to-b from-[#0f0f11] via-[#09090a] to-[#020202]",
+    textColor: "text-slate-100",
+    accentColor: "text-[#ffffff] bg-white/10 border-[#ffffff]",
+    font: "font-sans",
+    styleDescription: "Ultra-pure aesthetic inspired by premium black and white agency websites. No colorful distractions, absolute focus."
+  },
+  {
     id: "modern-dark",
     name: "Modern Studio",
     className: "theme-modern-dark",
