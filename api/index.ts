@@ -25,6 +25,26 @@ const getGeminiClient = () => {
   });
 };
 
+// Extremely robust model helper with automatic fallback to prevent 503 Service Unavailable errors
+async function generateContentWithFallback(ai: any, params: any) {
+  const primaryModel = params.model || "gemini-3.5-flash";
+  const backupModel = primaryModel === "gemini-3.5-flash" ? "gemini-3.1-flash-lite" : "gemini-3.5-flash";
+  
+  try {
+    console.log(`[AI Model] Attempting generation with primary model: ${primaryModel}`);
+    return await ai.models.generateContent(params);
+  } catch (error: any) {
+    console.warn(`[AI Model] Primary model ${primaryModel} failed: ${error.message || error}. Falling back to ${backupModel}...`);
+    try {
+      const fallbackParams = { ...params, model: backupModel };
+      return await ai.models.generateContent(fallbackParams);
+    } catch (fallbackError: any) {
+      console.error(`[AI Model] Fallback model ${backupModel} also failed:`, fallbackError);
+      throw error; // throw original error if fallback also fails
+    }
+  }
+}
+
 // Combined fast single-fetch HTML helper to scrape context + logo in one go
 async function fetchAndAnalyzeUrl(targetUrl: string): Promise<{ context: string; logoUrl: string }> {
   let timeoutId: any = null;
@@ -205,7 +225,7 @@ ${scrapeResult.context}
 URL domain or brand: "${url}"
 `;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithFallback(ai, {
       model: "gemini-3.5-flash",
       contents: [
         { text: instruction },
@@ -313,7 +333,7 @@ Chosen Style Palette: "${visualTheme || 'modern-dark'}"
 Please design the exactly ${slideCount} scenes logically so they flow nicely from a hook (Scene 1) to the key product benefits/services (intermediate scenes) and a strong Call to Action (last scene). Keep it concise!
 `;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithFallback(ai, {
       model: "gemini-3.5-flash",
       contents: [
         { text: instruction },
@@ -469,7 +489,7 @@ Keep it concise (maximum 18 words) and extremely natural to listen to.
 Do not wrap in quotes or add metadata. Output only the refined sentence.
 `;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithFallback(ai, {
       model: "gemini-3.5-flash",
       contents: [
         { text: instruction },
