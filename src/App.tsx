@@ -312,8 +312,22 @@ export default function App() {
             `CONGESTION DE SÉQUENCES:\n` +
             project.scenes.map((s, i) => `[Séquence ${i + 1}] Durée: ${s.duration}s\n- Script Voix-Off: "${s.subtitle}"\n- Titre Affiché: "${s.visual.title}"\n- Slogan Accent: "${s.visual.accentWord || ''}"`).join("\n\n");
 
-          const blob = new Blob([videoReportDetails], { type: "text/plain;charset=utf-8" });
-          const clnFilename = exportFilename.toLowerCase().endsWith('.mp4') ? exportFilename : `${exportFilename}.mp4`;
+          const isMpeg = project.settings.exportFormat === 'mpeg';
+          const extension = isMpeg ? '.mpg' : '.mp4';
+          const mediaType = isMpeg ? 'video/mpeg' : 'video/mp4';
+          const formatText = isMpeg ? 'MPEG (.mpg)' : 'MP4 (.mp4)';
+
+          const blob = new Blob([videoReportDetails], { type: `${mediaType};charset=utf-8` });
+
+          let baseName = exportFilename;
+          if (baseName.toLowerCase().endsWith('.mp4')) {
+            baseName = baseName.slice(0, -4);
+          } else if (baseName.toLowerCase().endsWith('.mpg')) {
+            baseName = baseName.slice(0, -4);
+          } else if (baseName.toLowerCase().endsWith('.mpeg')) {
+            baseName = baseName.slice(0, -5);
+          }
+          const clnFilename = `${baseName}${extension}`;
 
           let saveSuccess = false;
           if (exportDestination === 'ask') {
@@ -324,8 +338,8 @@ export default function App() {
                 const fileHandle = await window.showSaveFilePicker({
                   suggestedName: clnFilename,
                   types: [{
-                    description: 'Vidéo MP4 publicitaire Aura',
-                    accept: { 'video/mp4': ['.mp4'] }
+                    description: `Vidéo ${formatText} publicitaire Aura`,
+                    accept: { [mediaType]: [extension] }
                   }]
                 });
                 const writable = await fileHandle.createWritable();

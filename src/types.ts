@@ -41,7 +41,7 @@ export interface ProjectSettings {
   name: string;
   aspectRatio: AspectRatio;
   visualTheme: string; // Theme ID, customizable
-  exportFormat: 'mp4' | 'gif' | 'web-canvas';
+  exportFormat: 'mp4' | 'mpeg' | 'gif' | 'web-canvas';
   logoUrl?: string; // Brand logo URL to render in video corner or base64 file
   avatarUrl?: string; // Interactive talking presenter avatar URL or file
   avatarStyle?: 'none' | 'floating' | 'split-screen' | 'podcast-bubble'; // Avatar rendering layout style

@@ -237,16 +237,34 @@ app.get("/api/health", (req, res) => {
 // 1. Pre-analyze Website API to extract topics, platforms and matching metadata
 app.post("/api/analyze-website", async (req, res) => {
   try {
-    const { url, language } = req.body;
-    if (!url || url.trim().length < 3) {
-      return res.status(400).json({ error: "L'adresse URL du site web est requise pour l'analyse." });
+    const { url, manualText, language } = req.body;
+    if ((!url || url.trim().length < 3) && (!manualText || manualText.trim().length < 3)) {
+      return res.status(400).json({ error: "L'adresse URL du site web ou un descriptif textuel est requis pour l'analyse." });
     }
 
     const targetLanguage = language === "en" ? "en" : "fr";
     const targetLangLabel = targetLanguage === "en" ? "English" : "French";
 
-    console.log(`Pre-analyzing website (Language: ${targetLangLabel}): ${url}`);
-    const scrapeResult = await fetchAndAnalyzeUrl(url);
+    console.log(`Pre-analyzing brand details (Language: ${targetLangLabel})`);
+    
+    let scrapeResult = {
+      context: "",
+      logoUrl: "",
+      primaryHeadings: [] as string[],
+      secondaryHeadings: [] as string[]
+    };
+
+    if (url && url.trim().length >= 3) {
+      scrapeResult = await fetchAndAnalyzeUrl(url);
+    } else if (manualText && manualText.trim().length >= 3) {
+      scrapeResult = {
+        context: manualText,
+        logoUrl: "",
+        primaryHeadings: [],
+        secondaryHeadings: []
+      };
+    }
+
     const ai = getGeminiClient();
 
     const instruction = `
@@ -258,6 +276,13 @@ CRITICAL TRUTH & DETAILS RULE (STRICTLY AVOID AI SLOP):
 - You are STRICTLY FORBIDDEN from generating generic marketing clichés or filler terms such as "Expertise sur mesure", "Votre Vitrine", "Gagner du temps", "Passez à l'action", "Boostez votre visibilité", "Partenaire idéal", or other generic filler copy.
 - Instead, you MUST study the text carefully to extract EXACT, highly specific features, real utility tools, or concrete concepts described on the site (for example, if the site is a tool like Talk&Post for LinkedIn writing, extract precise feature names like "Écriture Ghostwriting", "Calendrier de Publication", "Planificateur LinkedIn", "Statistiques & Portée", "Optimisation de Profil").
 - If the website analysis fails or context is sparse, examine the URL carefully. For example, a URL containing "talkandpost" is clearly a software product for LinkedIn, ghostwriting, and scheduling posts. Use this specific product understanding to propose genuine matching tools ("Planification LinkedIn", "Éditeur Ghostwriting") rather than generic business jargon.
+
+DYNAMIC COMPANION ONBOARDING QUESTIONS RULE:
+- You must generate EXACTLY 3 conversational communication-oriented questions tailored directly to this brand or website's positioning.
+- One question should orient their primary target audience or main communication challenge (e.g. for "le-grub.com", nomad workers vs business events vs corporate partners).
+- One question should orient the ultimate focus of their slogan or essential take-away message.
+- One question should orient the brand design/color elements (such as asking if they prefer a strong custom black/orange accent theme to match their site aesthetic, or a sleek stark high-contrast look).
+- For each question, provide EXACTLY 3 highly relevant, curated, pre-formulated options representing strategic positioning choices, in ${targetLangLabel}.
 
 VISUAL THEME DETECTION ASSISTANCE:
 - If the website references high-end photography, luxury, premium portfolios, motion design studios, minimalist black/white contrast, or pure raw designs (such as a black and white portfolio like Talk&Post or 1600.agency, or tech tools aiming for extreme focus), you MUST suggest 'stark-monochrome' as the 'suggestedVisualTheme'.
@@ -310,9 +335,26 @@ URL domain or brand: "${url}"
                 },
                 required: ["id", "title", "description", "selected"]
               }
+            },
+            onboardingQuestions: {
+              type: Type.ARRAY,
+              description: "Exactly 3 dynamic, highly relevant onboarding communication questions to refine the project design based on communication needs, target audience, and brand-specific details.",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING, description: "Unique index, e.g. 'q1', 'q2', 'q3'" },
+                  questionText: { type: Type.STRING, description: "Engaging and professional question tailored to this website in " + targetLangLabel },
+                  options: {
+                    type: Type.ARRAY,
+                    description: "Exactly 3 strategic preset options corresponding to different positioning avenues for the ad",
+                    items: { type: Type.STRING }
+                  }
+                },
+                required: ["id", "questionText", "options"]
+              }
             }
           },
-          required: ["detectedTitle", "suggestedSlogan", "understandingSummary", "suggestedPlatform", "suggestedVisualTheme", "suggestedTone", "extractedTopics"]
+          required: ["detectedTitle", "suggestedSlogan", "understandingSummary", "suggestedPlatform", "suggestedVisualTheme", "suggestedTone", "extractedTopics", "onboardingQuestions"]
         }
       }
     });
@@ -369,6 +411,16 @@ CRITICAL BRAND ALIGNMENT & THEME HONESTY:
 - Instead, you MUST study the provided headings and scraped context carefully. Capture the EXACT specific technical services, products, functional names, or core feature modules described in the crawled content (for example, if analyzing a LinkedIn writing tool like Talk&Post, use terms like "Éditeur Ghostwriting", "Planification de Posts", "Calendrier Éditorial", "Statistiques & Portée", instead of generic phrases).
 - Build the slide 'title' (2-4 words max) and slide 'subtitle' directly using key terms, structural page headers, or quotes from the scanned website context and headings.
 
+SUBTLE & ENGAGING HUMAN COPYWRITING RULE:
+- You MUST write the visual slide titles and text subtler and more human.
+- Strictly avoid writing dry cold tags like "Coworking unique" or "SaaS puissant".
+- Instead, use motivational, personalized, fluid and highly engaging wording like "Votre espace de coworking", "Un coworking inspirant", "Créons ensemble", or "Votre espace pour grandir". This makes the communication extremely motivating and human-centric.
+
+DYNAMIC BRAND COLORS & HIGHLIGHT ALIGNMENT:
+- You MUST check the brand URL, context, or logo info to deduce its dominant brand color (for example, le-grub.com has black and orange as dominant branding colors).
+- You MUST output a matching Hex color string in the 'customAccentColor' property of each scene's visual config (e.g. '#ea580c' or '#f97316' for an orange-themed brand, '#2563eb' for blue-themed SaaS, etc.). This ensures the highlight on the text is styled with the true brand color instead of defaulting to green or blue!
+- If the theme is stark-monochrome, do not return a custom color, or use '#ffffff' / '#f3f4f6'.
+
 STARK VISUAL CODE ENFORCEMENT:
 - If the visual theme requested is "stark-monochrome", you must STRICTLY output clean black/white/dark grayscale coordinates. The 'backgroundColor' MUST be an elegant black gradient/solid such as "bg-gradient-to-b from-[#0f0f12] via-[#09090a] to-[#020202]", "bg-[#0c0c0e]" or similar deep black/charcoal solid. Do NOT output colorful or vibrant highlights (no purple, yellow, rose, etc.). 
 - The scene's 'textStyle' for stark-monochrome should default to 'minimal' or 'impact' to maintain pristine visual typography.
@@ -389,6 +441,7 @@ Each scene needs:
   - 'title': A short punchy text to render in large bold display typography (in ${targetLangLabel}, 2-4 words max).
   - 'subtitle': Optional secondary contextual text (in ${targetLangLabel}).
   - 'accentWord': One specific word in the title/subtitle to highlight visually with a special accent color.
+  - 'customAccentColor': A hex code matching the brand primary accent color (e.g. '#f97316' for orange, '#3b82f6' for blue, etc.) to override standard green highlights.
   - 'backgroundColor': Tailored to the theme context. If theme is stark-monochrome, must be black or dark charcoal. Otherwise, standard gradients matching the theme.
   - 'backgroundType': Choose 'gradient' or 'solid'.
   - 'textPosition': Choose 'center', 'bottom', 'top', 'middle-left', or 'middle-right'.
@@ -456,6 +509,7 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
                       title: { type: Type.STRING, description: "Main short visible display heading" },
                       subtitle: { type: Type.STRING, description: "Optional helper caption" },
                       accentWord: { type: Type.STRING, description: "Exactly one word present in title/subtitle to highlight" },
+                      customAccentColor: { type: Type.STRING, description: "Hex color code to color the highlighted text (e.g. '#f97316' for orange, '#3b82f6' for blue)" },
                       backgroundColor: { type: Type.STRING, description: "Exactly a Tailwind gradient string, e.g. 'bg-gradient-to-tr from-violet-950 to-neutral-900'" },
                       backgroundType: { type: Type.STRING, description: "gradient or solid" },
                       textPosition: { type: Type.STRING, description: "center, bottom, top, middle-left, or middle-right" },
@@ -510,9 +564,11 @@ app.post("/api/generate-speech", async (req, res) => {
     const ai = getGeminiClient();
     console.log(`Generating TTS speech for voice "${voiceName}": "${text.substring(0, 30)}..."`);
     
+    const ttsPrompt = `Speak the following text with an extremely lively, warm, persuasive, and highly engaging tone of voice, perfect for a premium promotional advertisement. Ensure standard, seamless professional pauses, natural dynamic transitions, and expressive pacing. Avoid any robotic or flat monotony. Here is the text to synthesize: "${text}"`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview",
-      contents: [{ parts: [{ text: `Say naturally and fluidly: ${text}` }] }],
+      contents: [{ parts: [{ text: ttsPrompt }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {

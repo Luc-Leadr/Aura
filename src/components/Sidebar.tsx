@@ -68,6 +68,7 @@ export default function Sidebar({
     suggestedTone: string;
     scrapedLogoUrl: string;
     extractedTopics: Array<{ id: string; title: string; description: string; selected: boolean }>;
+    onboardingQuestions?: Array<{ id: string; questionText: string; options: string[] }>;
   } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -79,7 +80,7 @@ export default function Sidebar({
 
   // --- AI COMPANION STATES ---
   const [isCompanionActive, setIsCompanionActive] = useState(true);
-  const [companionStep, setCompanionStep] = useState<1 | 2 | 3 | 4>(1);
+  const [companionStep, setCompanionStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [companionStatusMsg, setCompanionStatusMsg] = useState("");
   const [companionUrlInput, setCompanionUrlInput] = useState("");
   const [companionManualInputText, setCompanionManualInputText] = useState("");
@@ -91,6 +92,11 @@ export default function Sidebar({
     manualText: "",
     theme: "stark-monochrome"
   });
+
+  // --- INTERACTIVE ONBOARDING QUESTIONS STATES ---
+  const [companionAnswersList, setCompanionAnswersList] = useState<Record<string, string>>({});
+  const [currentCustomQuestionIndex, setCurrentCustomQuestionIndex] = useState(0);
+  const [isAnalyzingManualText, setIsAnalyzingManualText] = useState(false);
 
   // Translation helpers
   const t = I18N_DICTS[language];
@@ -138,7 +144,8 @@ export default function Sidebar({
           extractedTopics: data.extractedTopics.map((topic: any) => ({
             ...topic,
             selected: true
-          }))
+          })),
+          onboardingQuestions: data.onboardingQuestions || []
         });
 
         if (onAnalyzeWebsiteComplete) {
@@ -226,6 +233,129 @@ export default function Sidebar({
       setAnalysisError(err.message || "Error analyzing website.");
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const DEFAULT_QUESTIONS = [
+    {
+      id: "q1",
+      questionText: language === 'fr' 
+        ? "Quel est l'axe de différenciation majeur ?" 
+        : "What is your main competitive advantage?",
+      options: language === 'fr' 
+        ? ["Simplicité & Rapidité d'accès", "Qualité haut de gamme / Premium", "Service humain de proximité"]
+        : ["Simplicity & Quick setup", "High-end / Premium Quality", "Human & Close Support"]
+    },
+    {
+      id: "q2",
+      questionText: language === 'fr' 
+        ? "Quelle valeur essentielle mettre en avant ?" 
+        : "What core benefit should we highlight most?",
+      options: language === 'fr'
+        ? ["Gagner du temps au quotidien", "Créer des synergies collectives", "Maximiser les résultats & l'impact"]
+        : ["Save daily workflow time", "Collaborate & build community", "Maximize ROI & conversion"]
+    },
+    {
+      id: "q3",
+      questionText: language === 'fr' 
+        ? "Quelles tonalités de surlignage préférez-vous ?" 
+        : "What branding accent highlighting fits best?",
+      options: language === 'fr'
+        ? ["Surlignage aux couleurs de la marque", "Contraste ultra sobre sans couleur superficielle", "Touches lumineuses et chaleureuses"]
+        : ["Brand guidelines custom code colors", "Ultra clean sleek slate high contrast", "Warm luminous pastel tones"]
+    }
+  ];
+
+  const handleAnalyzeManualText = async (inputText: string) => {
+    if (!inputText || inputText.trim().length < 5) return;
+    setIsAnalyzingManualText(true);
+    setAnalysisError(null);
+    try {
+      const response = await fetch("/api/analyze-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualText: inputText.trim(), language: workingLanguage })
+      });
+      if (!response.ok) {
+        throw new Error("L'analyse créative a échoué.");
+      }
+      const data = await response.json();
+      if (data && data.extractedTopics) {
+        setAnalysisResult({
+          detectedTitle: data.detectedTitle || "Ma Campagne",
+          suggestedSlogan: data.suggestedSlogan || "",
+          understandingSummary: data.understandingSummary || "",
+          suggestedPlatform: (data.suggestedPlatform === "tiktok" || data.suggestedPlatform === "instagram" || data.suggestedPlatform === "linkedin") ? data.suggestedPlatform : "instagram",
+          suggestedVisualTheme: data.suggestedVisualTheme || "modern-dark",
+          suggestedTone: data.suggestedTone || "energetic marketing",
+          scrapedLogoUrl: "",
+          extractedTopics: data.extractedTopics.map((topic: any) => ({
+            ...topic,
+            selected: true
+          })),
+          onboardingQuestions: data.onboardingQuestions || []
+        });
+
+        const proposedPlatform = data.suggestedPlatform || 'instagram';
+        let targetRatio: AspectRatio = '1:1';
+        if (proposedPlatform === 'linkedin') targetRatio = '16:9';
+        else if (proposedPlatform === 'tiktok') targetRatio = '9:16';
+
+        const suggestedThemeId = data.suggestedVisualTheme || "modern-dark";
+        const selectedThemePreset = VISUAL_THEMES.find(vt => vt.id === suggestedThemeId) || VISUAL_THEMES[0];
+
+        const proposedScenes: Scene[] = data.extractedTopics.map((topic: any, i: number) => ({
+          id: `draft-scene-${i}-${Date.now()}`,
+          duration: 5,
+          subtitle: topic.description || "Présentation de notre concept phare",
+          visual: {
+            title: topic.title || "Innovation Aura",
+            subtitle: data.detectedTitle || "Ma Marque",
+            accentWord: topic.title ? topic.title.split(' ')[0] : "Aura",
+            backgroundColor: selectedThemePreset.bgGradient,
+            backgroundType: "gradient",
+            textPosition: "center",
+            textStyle: suggestedThemeId === "stark-monochrome" ? "impact" : "bordered",
+            animationType: suggestedThemeId === "stark-monochrome" ? "reveal" : "drift",
+            assetKeywords: topic.title || "abstract minimalist",
+            fontFamily: selectedThemePreset.font || "inter",
+            customAccentColor: ""
+          },
+          audio: {
+            voiceName: "Zephyr",
+            speechSpeed: 1,
+            backgroundMusicVibe: "lofi",
+            volume: 0.8
+          },
+          transition: "fade"
+        }));
+
+        if (onUpdateProject) {
+          onUpdateProject({
+            settings: {
+              ...settings,
+              name: data.detectedTitle || settings.name,
+              platform: proposedPlatform,
+              aspectRatio: targetRatio,
+              visualTheme: suggestedThemeId,
+              logoUrl: "",
+              slideCount: data.extractedTopics.length,
+              workingLanguage: workingLanguage,
+              interfaceLanguage: language
+            },
+            scenes: proposedScenes
+          });
+        }
+
+        setScriptVibe(data.suggestedTone || "energetic marketing");
+        const bulletPoints = data.extractedTopics.map((t: any) => `- ${t.title}: ${t.description}`).join("\n");
+        setPrompt(`Slogan: ${data.suggestedSlogan || ""}\n\nThèmes sélectionnés à aborder:\n${bulletPoints}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisError(err.message || "Erreur d'analyse.");
+    } finally {
+      setIsAnalyzingManualText(false);
     }
   };
 
@@ -889,26 +1019,142 @@ export default function Sidebar({
                 </div>
               )}
 
-              {/* --- STEP 3: STYLE & SLOP REDUCTION --- */}
+              {/* --- STEP 3: INTERACTIVE AI AGENT ONBOARDING QUESTIONS --- */}
               {companionStep >= 3 && (
-                <div className="space-y-3.5 pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
                   <div className="flex items-start gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] flex-shrink-0 border">🤖</div>
+                    <div className="w-6 h-6 rounded-full bg-slate-900 border border-slate-800 text-white flex items-center justify-center text-[10px] flex-shrink-0">🤖</div>
                     <div className="bg-slate-50 border border-slate-200/85 p-3 rounded-2xl rounded-tl-none max-w-[88%] text-[11px] leading-relaxed font-semibold text-slate-800 space-y-2">
-                      <p>
-                        {language === 'fr'
-                          ? "Superbe. Pour garantir que la vidéo soit d'une lisibilité immédiate, l'IA va optimiser l'affichage avec des contrastes exceptionnels."
-                          : "Got it. To ensure outstanding readability on screens, the IA will set ultra high contrast layouts."}
+                      <p className="text-indigo-950 font-black flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-505 animate-pulse" />
+                        {language === 'fr' ? "Questions stratégiques d'orientation IA :" : "AI Co-pilot Strategic Questions:"}
                       </p>
-                      <p className="font-extrabold text-indigo-950">
-                        {language === 'fr'
-                          ? "Quel style graphique et colorimétrique préférez-vous appliquer pour cette campagne ?"
-                          : "Which visual style preset aligns closest with your branding?"}
+                      <p className="text-slate-500 font-medium">
+                        {(analysisResult?.onboardingQuestions && analysisResult.onboardingQuestions.length > 0)
+                          ? (language === 'fr' 
+                              ? "Afin d'assurer une communication engageante & motivante, l'IA vous soumet ces questions sur-mesure :" 
+                              : "To guarantee highly engaging & motivational messaging, please clarify these custom details:")
+                          : (language === 'fr'
+                              ? "Faisons un brief express guidé par l'IA d'Aura pour cibler l'essentiel du message :"
+                              : "Let's perform a fast briefing guided by Aura's AI to keep titles completely clutter-free:")
+                        }
                       </p>
                     </div>
                   </div>
 
                   {companionStep === 3 ? (
+                    <div className="pl-8 space-y-3 animate-in fade-in duration-200">
+                      {(() => {
+                        const questionsList = (analysisResult?.onboardingQuestions && analysisResult.onboardingQuestions.length > 0) 
+                          ? analysisResult.onboardingQuestions 
+                          : DEFAULT_QUESTIONS;
+                        
+                        const currentQ = questionsList[currentCustomQuestionIndex];
+                        if (!currentQ) return null;
+
+                        return (
+                          <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3.5 shadow-2xs">
+                            <div className="flex items-center justify-between text-[9px] text-indigo-650 font-black uppercase font-mono tracking-tight">
+                              <span>{language === 'fr' ? "Question" : "Question"} {currentCustomQuestionIndex + 1} / {questionsList.length}</span>
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">{language === 'fr' ? "Brief Interactif" : "Interactive Brief"}</span>
+                            </div>
+
+                            <p className="text-xs font-black text-slate-800 leading-snug">{currentQ.questionText}</p>
+
+                            <div className="flex flex-col gap-1.5">
+                              {currentQ.options.map((optionText, oIdx) => (
+                                <button
+                                  key={`${currentQ.id}-opt-${oIdx}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setCompanionAnswersList(prev => ({
+                                      ...prev,
+                                      [currentQ.questionText]: optionText
+                                    }));
+                                    
+                                    if (currentCustomQuestionIndex < questionsList.length - 1) {
+                                      setCurrentCustomQuestionIndex(prev => prev + 1);
+                                    } else {
+                                      setCompanionStep(4);
+                                    }
+                                  }}
+                                  className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 hover:border-indigo-400 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition cursor-pointer flex justify-between items-center leading-normal"
+                                >
+                                  <span className="pr-2">{optionText}</span>
+                                  <span className="text-[8px] bg-indigo-50 text-indigo-600 px-1 py-0.5 rounded flex-shrink-0 font-mono">Select</span>
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-[9px] font-bold text-slate-500">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (currentCustomQuestionIndex > 0) {
+                                    setCurrentCustomQuestionIndex(prev => prev - 1);
+                                  } else {
+                                    setCompanionStep(2);
+                                  }
+                                }}
+                                className="hover:underline flex items-center gap-0.5 cursor-pointer text-slate-500 hover:text-slate-800"
+                              >
+                                ⬅️ {language === 'fr' ? "Précédent" : "Previous"}
+                              </button>
+                              <span className="text-slate-400 font-medium">Auto-Brief Co-pilot</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="flex justify-end gap-2 items-start mt-0.5 animate-in fade-in duration-200">
+                      <div className="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none text-xs leading-relaxed font-semibold max-w-[85%] flex flex-col items-end shadow-xs space-y-1.5">
+                        <span className="text-[8px] font-extrabold text-indigo-200 uppercase font-mono tracking-tight block border-b border-indigo-500/50 pb-0.5 w-full text-right">
+                          📋 {language === 'fr' ? "Brief stratégique validé" : "Strategic Brief Saved"}
+                        </span>
+                        <div className="space-y-1 text-right text-[10px] text-indigo-150 max-w-full font-medium">
+                          {Object.entries(companionAnswersList).map(([q, ans], idx) => (
+                            <p key={`ans-summary-${idx}`} className="truncate max-w-[200px]">
+                              Q{idx+1}: <span className="text-white font-bold">{ans}</span>
+                            </p>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompanionStep(3);
+                            setCurrentCustomQuestionIndex(0);
+                          }}
+                          className="text-[8px] uppercase font-bold text-indigo-200 mt-1 hover:underline flex items-center gap-0.5 cursor-pointer"
+                        >
+                          ✏️ {language === 'fr' ? 'Modifier réponses' : 'Modify answers'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* --- STEP 4: STYLE & PALETTE SELECTION --- */}
+              {companionStep >= 4 && (
+                <div className="space-y-3.5 pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] flex-shrink-0">🤖</div>
+                    <div className="bg-slate-50 border border-slate-200/85 p-3 rounded-2xl rounded-tl-none max-w-[88%] text-[11px] leading-relaxed font-semibold text-slate-800 space-y-2">
+                      <p>
+                        {language === 'fr'
+                          ? "Génial ! Je m'occupe d'orienter toute l'écriture du script pour répondre à ces choix subtilement."
+                          : "Superb. I am weaving these answers explicitly into copywriting and layout selection."}
+                      </p>
+                      <p className="font-extrabold text-indigo-950">
+                        {language === 'fr'
+                          ? "Quel thème visuel et colorimétrique préférez-vous appliquer pour cette campagne ?"
+                          : "Which visual style preset aligns closest with your branding?"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {companionStep === 4 ? (
                     <div className="pl-8 space-y-2 animate-in fade-in duration-200">
                       <div className="flex flex-col gap-2">
                         {/* Stark monochrome choice */}
@@ -917,7 +1163,7 @@ export default function Sidebar({
                           onClick={() => {
                             onUpdateSettings({ ...settings, visualTheme: 'stark-monochrome' });
                             setCompanionAnswers(prev => ({ ...prev, theme: 'stark-monochrome' }));
-                            setCompanionStep(4);
+                            setCompanionStep(5);
                           }}
                           className="w-full text-left p-3 bg-[#0c0c0e] hover:bg-[#111115] border border-slate-700 rounded-xl transition cursor-pointer flex items-center gap-3 text-white"
                         >
@@ -936,7 +1182,7 @@ export default function Sidebar({
                           onClick={() => {
                             onUpdateSettings({ ...settings, visualTheme: 'modern-dark' });
                             setCompanionAnswers(prev => ({ ...prev, theme: 'modern-dark' }));
-                            setCompanionStep(4);
+                            setCompanionStep(5);
                           }}
                           className="w-full text-left p-3 bg-gradient-to-r from-slate-900 to-indigo-950 border border-indigo-900 hover:border-indigo-700 hover:from-slate-850 hover:to-indigo-900 rounded-xl transition cursor-pointer flex items-center gap-3 text-white"
                         >
@@ -953,10 +1199,10 @@ export default function Sidebar({
                       <div className="pt-1 text-left">
                         <button 
                           type="button" 
-                          onClick={() => setCompanionStep(2)} 
+                          onClick={() => setCompanionStep(3)} 
                           className="text-[9px] text-slate-500 hover:underline cursor-pointer"
                         >
-                          ⬅️ Modifier l'étape précédente
+                          ⬅️ {language === 'fr' ? "Retourner aux questions de brief" : "Back to brief questions"}
                         </button>
                       </div>
                     </div>
@@ -968,10 +1214,10 @@ export default function Sidebar({
                           : (language === 'fr' ? 'Modern Studio (Bleu & Émeraude)' : 'Modern Studio (Blue & Emerald)')}</p>
                         <button
                           type="button"
-                          onClick={() => setCompanionStep(3)}
+                          onClick={() => setCompanionStep(4)}
                           className="text-[8px] uppercase font-bold text-indigo-400 mt-1.5 hover:underline flex items-center gap-0.5 cursor-pointer"
                         >
-                          ✏️ {language === 'fr' ? 'Modifier' : 'Modify'}
+                          ✏️ {language === 'fr' ? 'Modifier thème' : 'Modify theme'}
                         </button>
                       </div>
                     </div>
@@ -979,16 +1225,16 @@ export default function Sidebar({
                 </div>
               )}
 
-              {/* --- STEP 4: FINAL RECAP & LAUNCH BUTTON --- */}
-              {companionStep >= 4 && (
+              {/* --- STEP 5: FINAL RECAP & LAUNCH BUTTON --- */}
+              {companionStep >= 5 && (
                 <div className="space-y-3.5 pt-2 animate-in fade-in slide-in-from-top-1 duration-300">
                   <div className="flex items-start gap-2.5">
                     <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] flex-shrink-0 border">🤖</div>
-                    <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-2xl rounded-tl-none max-w-[88%] text-[11px] leading-relaxed font-semibold text-slate-800 space-y-3_5">
+                    <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-2xl rounded-tl-none max-w-[88%] text-[11px] leading-relaxed font-semibold text-slate-800 space-y-3.5">
                       <p className="font-extrabold text-slate-900 leading-normal">
                         {language === 'fr'
-                          ? "Tout est reconfiguré de manière optimale ! ✨ J'ai synthétisé les critères créatifs de votre projet pour garantir un rendu publicitaire à haut taux de conversion."
-                          : "Perfect! All settings are reconfigured optimally. ✨ I streamlined the creative constraints to ensure a high-converting output."}
+                          ? "Tout est reconfiguré de manière optimale ! ✨ J'ai synthétisé les critères créatifs de votre projet pour garantir un rendu publicitaire épuré et percutant."
+                          : "Perfect! All settings are reconfigured optimally. ✨ I streamlined the creative constraints to ensure a clutter-free and readable output."}
                       </p>
 
                       <div className="bg-white/80 border border-slate-200 p-2.5 rounded-lg text-[10px] space-y-1.5 font-bold text-slate-600 block shadow-2xs">
@@ -1012,17 +1258,33 @@ export default function Sidebar({
 
                       <p className="text-[10px] text-slate-500 italic font-semibold leading-relaxed">
                         {language === 'fr' 
-                          ? "💡 L'IA a banni tous les clichés marketing habituels pour se concentrer uniquement sur vos forces clefs. Le storyboard final sera épuré et facile à mémoriser."
-                          : "💡 All generic marketing clichés are blocked. Your ad will be uncluttered, and focus on your core features."}
+                          ? "💡 L'IA a banni tous les clichés marketing lourds. Votre storyboard sera épuré et optimisé pour une lecture immédiate et un engagement maximal."
+                          : "💡 All heavy marketing clichés are banned. Your storyboard is optimized for extreme readability, engageable copy, and motivative essence."}
                       </p>
 
-                      {/* Launch call triggers isGenerating state */}
+                      {/* Launch call triggers isGenerating state with full user brief compilation */}
                       <button
                         type="button"
                         disabled={isGenerating}
                         onClick={() => {
+                          const parts = [];
+                          if (companionAnswers.objective) {
+                            parts.push(`Objectif principal: ${companionAnswers.objective}`);
+                          }
+                          if (companionAnswers.manualText) {
+                            parts.push(`Spécifications de l'offre: ${companionAnswers.manualText}`);
+                          }
+                          const answerKeys = Object.keys(companionAnswersList);
+                          if (answerKeys.length > 0) {
+                            parts.push(`Critères d'orientation validés avec l'agent Aura:`);
+                            answerKeys.forEach((qText) => {
+                              parts.push(`- Question: ${qText}\n  Choix utilisateur: ${companionAnswersList[qText]}`);
+                            });
+                          }
+                          const finalAssembledBriefPrompt = parts.length > 0 ? parts.join("\n\n") : prompt;
+
                           onGenerateStoryboard({ 
-                            prompt, 
+                            prompt: finalAssembledBriefPrompt, 
                             url, 
                             scriptVibe,
                             slideCount: activeSlideCount,
@@ -1622,29 +1884,41 @@ export default function Sidebar({
 
             <div className="space-y-3 pt-2">
               <h4 className="font-bold text-slate-700">Format d'exportation final</h4>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 text-[10px]">
                 <button
                   id="export-canvas"
                   onClick={() => onUpdateSettings({ ...settings, exportFormat: 'web-canvas' })}
-                  className={`p-2.5 rounded border text-center font-bold cursor-pointer transition-all ${
+                  className={`py-2 px-1 rounded border text-center font-bold cursor-pointer transition-all ${
                     settings.exportFormat === 'web-canvas'
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                       : 'border-slate-200 hover:border-slate-300 text-slate-500'
                   }`}
                 >
-                  Interactive Player
+                  Web Player
                 </button>
                 <button
                   id="export-mp4"
                   type="button"
                   onClick={() => onUpdateSettings({ ...settings, exportFormat: 'mp4' })}
-                  className={`p-2.5 rounded border text-center font-bold cursor-pointer transition-all ${
+                  className={`py-2 px-1 rounded border text-center font-bold cursor-pointer transition-all ${
                     settings.exportFormat === 'mp4'
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                       : 'border-slate-200 hover:border-slate-300 text-slate-500'
                   }`}
                 >
-                  Fichier MP4 (Shorts)
+                  Vidéo MP4 (.mp4)
+                </button>
+                <button
+                  id="export-mpeg"
+                  type="button"
+                  onClick={() => onUpdateSettings({ ...settings, exportFormat: 'mpeg' })}
+                  className={`py-2 px-1 rounded border text-center font-bold cursor-pointer transition-all ${
+                    settings.exportFormat === 'mpeg'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-500'
+                  }`}
+                >
+                  Vidéo MPEG (.mpg)
                 </button>
               </div>
             </div>
