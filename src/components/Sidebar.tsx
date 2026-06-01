@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   Sparkles, 
   Link2, 
@@ -21,7 +21,11 @@ import {
   Tv,
   Globe,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff
 } from "lucide-react";
 import { SAMPLE_SOURCE_EXAMPLES, VISUAL_THEMES, PRESET_AVATARS, I18N_DICTS } from "../constants";
 import { Project, Scene, ProjectSettings, AspectRatio } from "../types";
@@ -42,7 +46,7 @@ interface SidebarProps {
   onUpdateCampaignType: (t: 'video-animated' | 'static-carousel' | 'linkedin-3-posts') => void;
   suggestedLinkedinPost: string;
   isAdjusting: boolean;
-  onAdjustStoryboard: (feedback: string) => Promise<void>;
+  onAdjustStoryboard: (feedback: string) => Promise<any>;
   hasGenerated: boolean;
 }
 
@@ -69,20 +73,7 @@ export default function Sidebar({
   const [url, setUrl] = useState("");
   const [scriptVibe, setScriptVibe] = useState("energetic marketing");
   const [activeTab, setActiveTab] = useState<'create' | 'examples' | 'settings'>('create');
-  
-  // Interactive Live Copilot state
-  const [copilotFeedbackInput, setCopilotFeedbackInput] = useState("");
-  
-  const handleSendFeedbackToCopilot = async () => {
-    if (!copilotFeedbackInput.trim() || isAdjusting) return;
-    try {
-      await onAdjustStoryboard(copilotFeedbackInput);
-      setCopilotFeedbackInput("");
-    } catch (err) {
-      console.error("Adjustment handler failure:", err);
-    }
-  };
-  
+
   // Website auto-proposition states
   const [analysisResult, setAnalysisResult] = useState<{
     detectedTitle: string;
@@ -122,6 +113,210 @@ export default function Sidebar({
   const [companionAnswersList, setCompanionAnswersList] = useState<Record<string, string>>({});
   const [currentCustomQuestionIndex, setCurrentCustomQuestionIndex] = useState(0);
   const [isAnalyzingManualText, setIsAnalyzingManualText] = useState(false);
+  
+  // Interactive Live Copilot state & Speech capability
+  const [copilotFeedbackInput, setCopilotFeedbackInput] = useState("");
+  const [isVoiceActive, setIsVoiceActive] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'aura'; text: string; timestamp: string }>>([
+    {
+      sender: 'aura',
+      text: language === 'fr'
+        ? "Bonjour ! Votre campagne a été modélisée. 🎬 Expliquez-moi de vive voix vos ajustements (ex: 'Rend le titre de la slide 2 plus créatif' ou 'Change la couleur en vert menthe'). Que souhaitez-vous modifier ?"
+        : "Hello! Your multi-device marketing brief is generated. 🎬 Tell me your exact adjustments (e.g., 'Make scene 2 title much punchier!' or 'Aura, switch theme layout to emerald'). What would you like to run?",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+
+  // Client-side High Quality Speech Synthesis (Text to Speech)
+  const speakText = (text: string) => {
+    if (!window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      // Remove symbols or hashtags for natural flow
+      const cleanString = text.replace(/[*#▪•-•●]/g, '').trim();
+      const utterance = new SpeechSynthesisUtterance(cleanString);
+      utterance.lang = language === 'fr' ? 'fr-FR' : 'en-US';
+      
+      const voices = window.speechSynthesis.getVoices();
+      // Look for a high-quality human French/English female voice
+      const femaleVoice = voices.find(v => v.name.toLowerCase().includes('google') && v.lang.startsWith(language === 'fr' ? 'fr' : 'en')) || 
+                          voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('claire') || v.name.toLowerCase().includes('zira') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('google standard')) ||
+                          voices.find(v => v.lang.startsWith(language === 'fr' ? 'fr' : 'en'));
+      if (femaleVoice) {
+        utterance.voice = femaleVoice;
+      }
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error("SpeechSynthesis error:", e);
+    }
+  };
+
+  // Browser-native Speech Recognition (Speech to Text)
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(language === 'fr' 
+        ? "La reconnaissance vocale n'est pas supportée dans votre navigateur actuel. Merci d'utiliser Chrome, Edge ou Safari." 
+        : "Speech recognition is not supported in your current browser. Please try Chrome, Edge or Safari.");
+      return;
+    }
+    
+    try {
+      if (isListening) {
+        setIsListening(false);
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = language === 'fr' ? 'fr-FR' : 'en-US';
+      recognition.interimResults = false;
+      
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+      
+      recognition.onresult = (event: any) => {
+        if (event.results && event.results[0] && event.results[0][0]) {
+          const transcript = event.results[0][0].transcript;
+          setCopilotFeedbackInput(transcript);
+        }
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognition.start();
+    } catch (err) {
+      console.error("Speech recognition start failed:", err);
+      setIsListening(false);
+    }
+  };
+
+  // Handle live feedback with conversation logs
+  const handleSendFeedbackToCopilot = async () => {
+    if (!copilotFeedbackInput.trim() || isAdjusting) return;
+    const currentText = copilotFeedbackInput;
+    setCopilotFeedbackInput("");
+
+    // Append user's balloon
+    setChatMessages(prev => [
+      ...prev,
+      {
+        sender: 'user',
+        text: currentText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+
+    try {
+      const outcome = await onAdjustStoryboard(currentText);
+      if (outcome && outcome.chatResponse) {
+        // Append Aura's reply
+        setChatMessages(prev => [
+          ...prev,
+          {
+            sender: 'aura',
+            text: outcome.chatResponse,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+        if (isVoiceActive) {
+          speakText(outcome.chatResponse);
+        }
+      } else {
+        // Fallback message
+        const reply = language === 'fr'
+          ? "J'ai appliqué vos corrections créatives de l'offre sur les slides. Le rendu a été mis à jour instantanément !"
+          : "I applied your creative copy edits on the designated scenes. The workspace view is synced!";
+        setChatMessages(prev => [
+          ...prev,
+          {
+            sender: 'aura',
+            text: reply,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+        if (isVoiceActive) speakText(reply);
+      }
+    } catch (err) {
+      console.error("Adjustment handler failure:", err);
+      const errReply = language === 'fr'
+        ? "Mille excuses, j'ai rencontré une petite erreur de liaison lors de la reconstruction. Merci de réitérer."
+        : "Hum, I encountered a brief connection error while processing your request. Please try again.";
+      setChatMessages(prev => [
+        ...prev,
+        {
+          sender: 'aura',
+          text: errReply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      if (isVoiceActive) speakText(errReply);
+    }
+  };
+
+  // Oral guidance for wizard onboarding steps - Aura speaks questions automatically
+  useEffect(() => {
+    if (isCompanionActive && isVoiceActive) {
+      if (companionStep === 1) {
+        speakText(language === 'fr' 
+          ? "Quel est l'objectif premier de cette vidéo publicitaire ?" 
+          : "What is the primary objective of this ad campaign?");
+      } else if (companionStep === 2) {
+        speakText(language === 'fr'
+          ? "Disposez-vous d'une adresse de site internet à analyser pour en extraire l'ADN ?"
+          : "Do you have a website URL to extract real, clean facts from?");
+      } else if (companionStep === 3) {
+        speakText(language === 'fr'
+          ? "Faisons un brief express guidé par l'IA d'Aura pour cibler l'essentiel du message."
+          : "Let's perform a fast briefing guided by Aura's AI to target the key messaging.");
+      } else if (companionStep === 4) {
+        speakText(language === 'fr'
+          ? "Quel thème visuel et colorimétrique préférez-vous appliquer pour cette campagne ?"
+          : "Which visual style preset aligns closest with your branding?");
+      } else if (companionStep === 5) {
+        speakText(language === 'fr'
+          ? "Tout est reconfiguré de manière optimale ! J'ai synthétisé les critères créatifs."
+          : "Perfect! All settings are reconfigured optimally. I streamlined the creative constraints.");
+      }
+    }
+  }, [companionStep, isCompanionActive]);
+
+  // Oral guidance for onboarding custom questions
+  useEffect(() => {
+    if (isCompanionActive && companionStep === 3 && isVoiceActive) {
+      const qList = (analysisResult?.onboardingQuestions && analysisResult.onboardingQuestions.length > 0)
+        ? analysisResult.onboardingQuestions
+        : [
+            { questionText: language === 'fr' ? "Qu'est-ce qui caractérise le plus votre solution ?" : "What is the single most compelling element of your product?" },
+            { questionText: language === 'fr' ? "À qui s'adresse principalement cette campagne ?" : "What is the primary target group or audience for this?" }
+          ];
+      const currentQ = qList[currentCustomQuestionIndex];
+      if (currentQ) {
+        speakText(currentQ.questionText);
+      }
+    }
+  }, [currentCustomQuestionIndex, companionStep, isCompanionActive]);
+
+  // Read introductory text when campaign completes
+  useEffect(() => {
+    if (hasGenerated && isVoiceActive) {
+      const welcomeText = language === 'fr'
+        ? "Votre campagne a été générée avec succès ! Expliquez-moi de vive voix vos ajustements sémantiques ou créatifs sur-mesure."
+        : "Your multi-format campaign was generated successfully! Direct my creative output by voice or text.";
+      speakText(welcomeText);
+    }
+  }, [hasGenerated]);
+  
+  const const_blank_space = "";
 
   // Translation helpers
   const t = I18N_DICTS[language];
@@ -656,6 +851,108 @@ export default function Sidebar({
       <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
         {activeTab === 'create' && (
           <div className="space-y-4">
+            {/* 1. SELECTION DU CANAL/FORMAT DE CRÉATION */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-205 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                  ✨ {language === 'fr' ? "FORMAT DE PRODUCTION" : "PRODUCTION FORMAT"}
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isVoiceActive;
+                      setIsVoiceActive(next);
+                      if (next) {
+                        speakText(language === 'fr' ? "Voix d'Aura activée." : "Aura's voice enabled.");
+                      }
+                    }}
+                    className={`px-2 py-1 rounded-md transition cursor-pointer flex items-center gap-1 text-[9px] font-black ${
+                      isVoiceActive ? 'bg-indigo-50 text-indigo-850 border border-indigo-200' : 'bg-slate-100 text-slate-400 border border-transparent'
+                    }`}
+                    title={language === 'fr' ? "Lecture vocale des questions" : "Voice reading of questions"}
+                  >
+                    {isVoiceActive ? <Volume2 className="w-3.5 h-3.5 text-indigo-650 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    <span>{isVoiceActive ? "Voix active" : "Vocal OFF"}</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-1.5 font-sans">
+                {/* Format 1: Motion design / Vidéo */}
+                <button
+                  id="format-choice-video"
+                  type="button"
+                  onClick={() => onUpdateCampaignType('video-animated')}
+                  className={`p-2 rounded-xl border-2 flex flex-col items-center justify-between transition-all cursor-pointer text-center h-[76px] ${
+                    campaignType === 'video-animated'
+                      ? 'bg-indigo-600 border-indigo-700 text-white font-black shadow-md scale-[1.03]'
+                      : 'bg-white border-slate-200 text-slate-650 hover:border-slate-350 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="text-base mt-1">🎥</span>
+                  <span className="text-[9.5px] font-black leading-none truncate w-full">
+                    {language === 'fr' ? 'Vidéo animée' : 'Simple Video'}
+                  </span>
+                  <span className={`text-[7px] font-bold uppercase font-mono px-1 rounded mb-1 ${
+                    campaignType === 'video-animated' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'
+                  }`}>
+                    {language === 'fr' ? 'Motion MP4' : 'MP4 Tech'}
+                  </span>
+                </button>
+
+                {/* Format 2: Carrousel de slides */}
+                <button
+                  id="format-choice-carousel"
+                  type="button"
+                  onClick={() => onUpdateCampaignType('static-carousel')}
+                  className={`p-2 rounded-xl border-2 flex flex-col items-center justify-between transition-all cursor-pointer text-center h-[76px] ${
+                    campaignType === 'static-carousel'
+                      ? 'bg-indigo-600 border-indigo-700 text-white font-black shadow-md scale-[1.03]'
+                      : 'bg-white border-slate-200 text-slate-650 hover:border-slate-350 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="text-base mt-1">🗂️</span>
+                  <span className="text-[9.5px] font-black leading-none truncate w-full">
+                    {language === 'fr' ? 'Carrousel' : 'Slide Deck'}
+                  </span>
+                  <span className={`text-[7px] font-bold uppercase font-mono px-1 rounded mb-1 ${
+                    campaignType === 'static-carousel' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'
+                  }`}>
+                    {language === 'fr' ? 'PDF Slides' : 'PDF Slides'}
+                  </span>
+                </button>
+
+                {/* Format 3: LinkedIn posts */}
+                <button
+                  id="format-choice-linkedin"
+                  type="button"
+                  onClick={() => onUpdateCampaignType('linkedin-3-posts')}
+                  className={`p-2 rounded-xl border-2 flex flex-col items-center justify-between transition-all cursor-pointer text-center h-[76px] ${
+                    campaignType === 'linkedin-3-posts'
+                      ? 'bg-indigo-600 border-indigo-700 text-white font-black shadow-md scale-[1.03]'
+                      : 'bg-white border-slate-200 text-slate-650 hover:border-slate-350 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="text-base mt-1">✍️</span>
+                  <span className="text-[9.5px] font-black leading-none truncate w-full">
+                    {language === 'fr' ? '3 posts' : '3 posts'}
+                  </span>
+                  <span className={`text-[7px] font-bold uppercase font-mono px-1 rounded mb-1 ${
+                    campaignType === 'linkedin-3-posts' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'
+                  }`}>
+                    {language === 'fr' ? 'Textes copy' : 'LinkedIn'}
+                  </span>
+                </button>
+              </div>
+
+              <p className="text-[9.5px] text-slate-450 leading-normal text-center mt-1 font-semibold">
+                {campaignType === 'video-animated' && (language === 'fr' ? "Fait un clip vidéo dynamique calqué sur l'identité avec transitions et musique de fond." : "Creates a high-impact animated video clip based on design principles.")}
+                {campaignType === 'static-carousel' && (language === 'fr' ? "Modélise un carrousel de slides de marque à haut taux de clic (PDF exportable)." : "Models a high-converting brand carousel ideal for sharing slide decks.")}
+                {campaignType === 'linkedin-3-posts' && (language === 'fr' ? "Rédige une campagne de 3 posts LinkedIn variés (Accroche produit, Étude, Convictions)." : "Drafts a series of 3 distinct, high-converting social copy variations.")}
+              </p>
+            </div>
+
             {/* COMPANION TOGGLE BAR */}
             <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg text-[10px] uppercase font-bold select-none tracking-tight">
               <button
@@ -1938,53 +2235,174 @@ export default function Sidebar({
 
             {/* AURA DIRECT COPILOT ADVISOR IN CO-PILOT CHAT */}
             {hasGenerated && (
-              <div id="aura-advisor-chat-sidebar" className="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 text-white p-4 rounded-2xl shadow-md space-y-3.5 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative">
-                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block absolute bottom-0 right-0 border-2 border-indigo-950 animate-ping" />
-                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block absolute bottom-0 right-0 border-2 border-slate-950" />
-                    <span className="text-xl">🤖</span>
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-[10px] font-black tracking-wider uppercase text-indigo-300 font-mono">AURA COPILOT ADVISOR</h4>
-                    <p className="text-[9px] text-indigo-300/80 font-bold">
-                      {language === 'fr' ? 'Échange de corrections en direct' : 'Live creative adjustments'}
-                    </p>
-                  </div>
-                </div>
+              <div id="aura-advisor-chat-sidebar" className="bg-gradient-to-b from-indigo-950 to-slate-900 border border-indigo-500/30 text-white p-4 rounded-2xl shadow-xl space-y-3 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 
-                <p className="text-[11px] text-slate-200 leading-relaxed font-semibold text-left">
-                  {language === 'fr' 
-                    ? "Expliquez précisément vos correctifs (ex: 'Rend le texte plus formel', 'Enlève le mot ghostwriting de la scène 1', 'Mets plus d'émoticônes' ou 'Ajuste le style')."
-                    : "Direct Aura's creative output (e.g. 'Make it look much wilder', 'Remove the slang terminology', 'Add bold statements')."}
-                </p>
+                {/* Header with Sarah Avatar */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <img 
+                        src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80" 
+                        alt="Aura AI" 
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-full object-cover border border-indigo-400"
+                      />
+                      <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full inline-block absolute bottom-0 right-0 border-2 border-slate-950 animate-pulse" />
+                    </div>
+                    <div className="text-left font-sans animate-pulse">
+                      <h4 className="text-[11px] font-black tracking-wider uppercase text-indigo-200 font-mono">
+                        AURA CO-PILOT
+                      </h4>
+                      <p className="text-[9.5px] text-slate-300 font-bold leading-tight">
+                        {language === 'fr' ? 'Échange vocal & texte' : 'Voice & text advisor'}
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder={language === 'fr' ? "Consignes d'ajustements..." : "Enter adjustment guidelines..."}
-                    value={copilotFeedbackInput}
-                    onChange={(e) => setCopilotFeedbackInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSendFeedbackToCopilot();
-                      }
-                    }}
-                    className="flex-1 min-w-0 bg-white/10 hover:bg-white/15 focus:bg-white border border-indigo-500/20 text-white font-semibold text-xs rounded-xl px-3 py-2 focus:text-slate-950 placeholder-indigo-300/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
-                  />
                   <button
                     type="button"
-                    onClick={handleSendFeedbackToCopilot}
-                    disabled={isAdjusting || !copilotFeedbackInput.trim()}
-                    className="p-2 px-3 bg-white text-indigo-950 font-black text-[10px] uppercase rounded-xl flex items-center justify-center shrink-0 border border-transparent hover:bg-slate-100 disabled:opacity-40 select-none transition cursor-pointer"
+                    onClick={() => {
+                      const next = !isVoiceActive;
+                      setIsVoiceActive(next);
+                      if (next) speakText(language === 'fr' ? "Voix activée." : "Reading enabled.");
+                    }}
+                    className={`p-1.5 rounded-lg transition-all border cursor-pointer ${
+                      isVoiceActive ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-300' : 'bg-white/5 border-white/10 text-white/40'
+                    }`}
+                    title={language === 'fr' ? "Activer/désactiver la voix" : "Toggle voice output"}
                   >
-                    {isAdjusting ? (
-                      <div className="w-3.5 h-3.5 rounded-full border-2 border-indigo-900 border-t-transparent animate-spin" />
-                    ) : (
-                      language === 'fr' ? 'Corriger' : 'Adjust'
-                    )}
+                    {isVoiceActive ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4" />}
                   </button>
+                </div>
+
+                {/* Scrollable Conversation History */}
+                <div className="max-h-[190px] overflow-y-auto pr-1 space-y-2.5 scrollbar-thin scrollbar-thumb-indigo-500/25">
+                  {chatMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[7.5px] font-bold text-slate-400 font-mono tracking-tight">{msg.timestamp}</span>
+                        <span className="text-[8.5px] font-black uppercase tracking-wider text-indigo-300 font-mono">
+                          {msg.sender === 'user' 
+                            ? (language === 'fr' ? 'Vous' : 'You') 
+                            : 'Aura'}
+                        </span>
+                      </div>
+                      <div className={`text-[11.5px] p-2.5 rounded-2xl max-w-[90%] leading-relaxed text-left font-semibold ${
+                        msg.sender === 'user' 
+                          ? 'bg-indigo-650 text-white rounded-tr-none' 
+                          : 'bg-white/10 text-indigo-50 border border-white/5 rounded-tl-none'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pre-made Quick Prompts (Suggestions d'ajustements rapides) */}
+                <div className="space-y-1 select-none">
+                  <p className="text-[8.5px] font-black uppercase text-indigo-300/80 text-left font-mono tracking-wide">
+                    ⚡ {language === 'fr' ? "AJUSTEMENTS RAPIDES" : "QUICK REVISIONS"}
+                  </p>
+                  <div className="flex flex-wrap gap-1 max-h-[82px] overflow-y-auto pr-0.5 scrollbar-none">
+                    {[
+                      { 
+                        label: language === 'fr' ? "🌟 Mettre en avant nos valeurs en final" : "🌟 Highlight values in finals", 
+                        prompt: language === 'fr' 
+                          ? "Ajuste la dernière slide pour mettre en avant les valeurs de l'entreprise ou le message principal recommandé sous forme d'accroche ou de message fort de l'équipe." 
+                          : "Please edit our final slide to strongly focus on our corporate values, ethics, and team pride mission statement" 
+                      },
+                      { 
+                        label: language === 'fr' ? "⚡ Plus persuasif & vendeur" : "⚡ More persuasive & sales oriented", 
+                        prompt: language === 'fr' 
+                          ? "Revisite les textes de toutes les scènes pour utiliser un ton persuasif de social-selling avec des verbes d'action robustes" 
+                          : "Rewrite copies to be high-impact social selling, action-packed content templates." 
+                      },
+                      { 
+                        label: language === 'fr' ? "🧩 Enlever le jargon technique" : "🧩 Remove tech jargon", 
+                        prompt: language === 'fr' 
+                          ? "Ajuste les slides pour simplifier le vocabulaire scientifique ou technique en mots humains ultra limpides." 
+                          : "Simplify technical definitions to highly human and plain words." 
+                      },
+                      { 
+                        label: language === 'fr' ? "🎯 Ajouter des émojis vivants" : "🎯 Add lifestyle emojis", 
+                        prompt: language === 'fr' 
+                          ? "Ajoute des émojis pertinents dans toutes les slides et dans le post linkedin pour maximiser l'intérêt visuel." 
+                          : "Add meaningful professional emojis into slide texts and written LinkedIn layout positions." 
+                      }
+                    ].map((item, id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          setCopilotFeedbackInput(item.prompt);
+                          speakText(language === 'fr' ? "Ajustement sélectionné." : "Revision configured.");
+                        }}
+                        className="text-[9px] font-black px-2 py-1 bg-white/5 border border-white/10 hover:bg-indigo-900/30 hover:border-indigo-500/40 text-indigo-200 hover:text-white rounded-lg transition cursor-pointer leading-tight max-w-full text-left truncate"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Form input with microphone icon */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        placeholder={
+                          isListening 
+                            ? (language === 'fr' ? "Aura vous écoute..." : "Aura is listening...") 
+                            : (language === 'fr' ? "Dicter ou écrire à Aura..." : "Aura, rewrite...")
+                        }
+                        value={copilotFeedbackInput}
+                        onChange={(e) => setCopilotFeedbackInput(e.target.value)}
+                        disabled={isAdjusting}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSendFeedbackToCopilot();
+                          }
+                        }}
+                        className={`w-full bg-white/10 hover:bg-white/15 focus:bg-white border border-indigo-500/20 text-white font-semibold text-xs rounded-xl pl-3 pr-9 py-2 focus:text-slate-900 placeholder-indigo-300/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition h-9 ${
+                          isListening ? 'ring-2 ring-rose-500/40 border-rose-500 bg-rose-950/20' : ''
+                        }`}
+                      />
+                      
+                      {/* Micro Button Inside Input */}
+                      <button
+                        type="button"
+                        onClick={startListening}
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all cursor-pointer ${
+                          isListening 
+                            ? 'bg-rose-600 text-white animate-pulse shadow-sm' 
+                            : 'bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white'
+                        }`}
+                        title={language === 'fr' ? "Parler avec le microphone" : "Speak with your microphone"}
+                      >
+                        {isListening ? <Mic className="w-3.5 h-3.5 animate-bounce" /> : <Mic className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSendFeedbackToCopilot}
+                      disabled={isAdjusting || !copilotFeedbackInput.trim()}
+                      className="px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-wide rounded-xl flex items-center justify-center shrink-0 hover:shadow-lg disabled:opacity-40 select-none transition cursor-pointer"
+                    >
+                      {isAdjusting ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      ) : (
+                        language === 'fr' ? 'Valider' : 'Submit'
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[8px] font-black text-slate-400 font-mono select-none">
+                    <span>{isListening ? "🔴 PARLEZ MAINTENANT" : "🎙️ CLIQUEZ SUR LE MICRO POUR DICTER D'UN COUP"}</span>
+                    <span>AURA ASSIST V1.2</span>
+                  </div>
                 </div>
               </div>
             )}

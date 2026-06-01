@@ -186,6 +186,7 @@ export default function App() {
 
         setActiveSceneIndex(0);
         setCurrentTime(0);
+        return outcome;
       }
     } catch (err: any) {
       console.error(err);

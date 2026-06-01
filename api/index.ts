@@ -582,19 +582,20 @@ app.post("/api/adjust-storyboard", async (req, res) => {
     const targetLangLabel = workingLanguage === "en" ? "English" : "French";
 
     const instruction = `
-You are an expert creative director, senior copywriter, and visual supervisor.
+You are Aura, an expert creative director, senior copywriter, and visual supervisor.
 You are given a list of visual scenes/slides FOR A STORYBOARD and an existing LinkedIn written post.
-The user wants to make adjustments. Their feedback is: "${feedback}".
+The user wants to make adjustments or has a question regarding your scope of actions. Their feedback/guideline is: "${feedback}".
 
 CRITICAL ADJUSTMENT AND CONTROL RULE:
 - Your job is to process this feedback and apply it PRECISELY to both the scenes list and the LinkedIn written text post.
 - If they ask to modify or remove a specific word (for example, "ghostwriting" or "expert"), locate where it is used in the subtitles, titles, or LinkedIn post, and replace it with more simple, clean, accurate terms.
 - Follow the feedback literally. Raise the caliber of the copywriting to feel completely human, authentic, and high-conversion.
 - Keep other unchanged scenes and post structures stable and identical to preserve cohesion.
+- Aura (the AI Advisor) must always reply to any questions inside the 'chatResponse' field. For example, if they ask about your scope of actions, explain what you can do (e.g., modify slide timing, adjust color palette or theme text, rewrite or suggest LinkedIn posts, optimize vocal rhythm, and synchronize media presets files).
 - The outcome MUST be completely written in ${targetLangLabel}. Do NOT mix languages.
 - You are STRICTLY FORBIDDEN from adding low-quality AI marketing slogans ("boostez vos ventes", "expertise sur mesure").
 
-Provide the adjusted output in RAW JSON adhering EXACTLY to the specified output schema.
+Provide the adjusted output in RAW JSON adhering EXACTLY to the specified output schema. Always populate the 'chatResponse' field in ${targetLangLabel} with a warm, expert comment explaining what you updated or directly answering their question.
 `;
 
     const userMessage = `
@@ -630,6 +631,10 @@ TARGET LANGUAGE: ${targetLangLabel}
             suggestedSlogan: {
               type: Type.STRING,
               description: "A primary slogan adjusted if necessary"
+            },
+            chatResponse: {
+              type: Type.STRING,
+              description: "A professional, warm and friendly direct message written by Aura (the AI Advisor) explaining the revisions she performed or answering the user's questions about her actions constraints."
             },
             suggestedLinkedinPost: {
               type: Type.STRING,
@@ -679,7 +684,7 @@ TARGET LANGUAGE: ${targetLangLabel}
               }
             }
           },
-          required: ["detectedTone", "suggestedSlogan", "scenes", "suggestedLinkedinPost"]
+          required: ["detectedTone", "suggestedSlogan", "scenes", "suggestedLinkedinPost", "chatResponse"]
         }
       }
     });
