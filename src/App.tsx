@@ -66,7 +66,7 @@ export default function App() {
   } | null>(null);
 
   // Advanced layout choices: video-animated vs static-carousel vs linkedin-3-posts
-  const [campaignType, setCampaignType] = useState<'video-animated' | 'static-carousel' | 'linkedin-3-posts'>('video-animated');
+  const [campaignType, setCampaignType] = useState<'video-animated' | 'static-carousel' | 'linkedin-3-posts'>('static-carousel');
   const [suggestedLinkedinPost, setSuggestedLinkedinPost] = useState<string>("");
   const [suggestedLinkedinPosts, setSuggestedLinkedinPosts] = useState<string[]>([
     "📍 [Concept & Accroche Unique]\n\nVotre marque mérite une visibilité à la hauteur de son excellence.\n\nPourquoi se contenter de visuels classiques quand vous pouvez avoir une identité de marque animée qui capte l'attention dès la première seconde ? Aura simplifie votre production publicitaire.\n\n✨ Analyse de site dynamique\n✨ Scénarisation IA sans jargon\n✨ Voix off synchronisées et directes\n\nPrêt à transformer vos pages web en clips haut-de-gamme ? Essayez le co-pilote d'Aura dès maintenant !",
@@ -589,22 +589,11 @@ export default function App() {
               <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border">
                 <button
                   type="button"
-                  onClick={() => setCampaignType('video-animated')}
-                  className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
-                    campaignType === 'video-animated'
-                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800 font-semibold'
-                  }`}
-                >
-                  🎥 {language === 'fr' ? 'Vidéo Animée Motion' : 'Animated Video'}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCampaignType('static-carousel')}
                   className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
                     campaignType === 'static-carousel'
                       ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800 font-semibold'
+                      : 'text-slate-505 hover:text-slate-800 font-semibold'
                   }`}
                 >
                   🗂️ {language === 'fr' ? 'Carrousel Slides' : 'Slide Carousel'}
