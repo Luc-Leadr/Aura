@@ -654,7 +654,7 @@ export default function Sidebar({
   };
 
   const handleLogoFile = (file: File) => {
-    if (file && (file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/jpg")) {
+    if (file && (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".svg") || file.name.toLowerCase().endsWith(".webp"))) {
       const reader = new FileReader();
       reader.onloadend = () => {
         onUpdateSettings({
@@ -852,6 +852,144 @@ export default function Sidebar({
       <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
         {activeTab === 'create' && (
           <div className="space-y-4">
+            {/* OMNIPRESENT SITE WEB & IDENTITÉ DE MARQUE */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3.5 shadow-2xs">
+              <div>
+                <label className="text-[11px] font-black text-slate-800 uppercase tracking-widest flex items-center justify-between">
+                  <span>🌐 {language === 'fr' ? "SITE WEB & LOGO DE MARQUE" : "WEBSITE & BRAND LOGO"}</span>
+                  <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-extrabold px-1.5 py-0.5 rounded uppercase font-mono">
+                    {settings.logoUrl ? (language === 'fr' ? "Logo Connecté" : "Logo Connected") : (language === 'fr' ? "Branding Actif" : "Branding Active")}
+                  </span>
+                </label>
+                <p className="text-[10px] text-slate-500 mt-1 leading-normal font-semibold">
+                  {language === 'fr' 
+                    ? "Scannez votre URL pour que l'IA en extraie l'ADN sémantique, et glissez-déposez le logo de votre entreprise." 
+                    : "Connect your URL for automated features extraction, and drop your custom brand icon."}
+                </p>
+              </div>
+
+              {/* Website Input & Scan Actions */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
+                    <Link2 className="w-3.5 h-3.5 text-indigo-505" />
+                  </span>
+                  <input
+                    id="persistent-website-url"
+                    type="text"
+                    placeholder={language === 'fr' ? "ex: talkandpost.com" : "e.g. yoursite.com"}
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setCompanionUrlInput(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && url.trim().length > 3) {
+                        e.preventDefault();
+                        handleAnalyzeWebsite();
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-210 text-slate-800 rounded-lg py-1.5 pl-8 pr-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none shadow-3xs font-semibold"
+                  />
+                </div>
+                <button
+                  id="btn-persistent-analyze"
+                  type="button"
+                  onClick={() => handleAnalyzeWebsite()}
+                  disabled={isAnalyzing || url.trim().length < 3}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-[10.5px] font-bold rounded-lg hover:shadow-xs transition flex items-center gap-1.5 cursor-pointer flex-shrink-0 disabled:opacity-40"
+                >
+                  {isAnalyzing ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    language === 'fr' ? "Scanner" : "Scan"
+                  )}
+                </button>
+              </div>
+
+              {/* Logo Drag n Drop Zone */}
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block font-mono">
+                    🎨 {language === 'fr' ? "Logotype de marque" : "Company Logo"}
+                  </span>
+                  {settings.logoUrl && (
+                    <span className="text-[7.5px] bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-black px-1.5 py-0.5 rounded uppercase font-mono">
+                      {language === 'fr' ? "Logo Intégré √" : "Logo Linked √"}
+                    </span>
+                  )}
+                </div>
+
+                {settings.logoUrl ? (
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-1.5 rounded-lg">
+                    <div className="relative flex items-center justify-center bg-white border border-slate-200 rounded-md p-1 w-8 h-8 shadow-3xs flex-shrink-0 overflow-hidden">
+                      <img 
+                        src={settings.logoUrl} 
+                        alt="Logo Marque" 
+                        className="max-w-full max-h-full object-contain rounded"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-[9px] font-extrabold text-slate-800 truncate">{language === 'fr' ? "Logo Actif" : "Active Brand Logo"}</p>
+                      <p className="text-[8px] text-slate-400 truncate">{language === 'fr' ? "Affiché sur le lecteur vidéo" : "Rendered inside watermark"}</p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => onUpdateSettings({ ...settings, logoUrl: "" })}
+                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md transition cursor-pointer"
+                      title={language === 'fr' ? "Supprimer le logo" : "Remove logo"}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    id="persistent-logo-drag-container"
+                    onDragEnter={handleLogoDrag}
+                    onDragOver={handleLogoDrag}
+                    onDragLeave={handleLogoDrag}
+                    onDrop={handleLogoDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border border-dashed rounded-lg p-3 text-center cursor-pointer transition ${
+                      dragActive 
+                        ? 'border-indigo-500 bg-indigo-50/50' 
+                        : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-slate-100/50'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4 text-indigo-500 mx-auto mb-1 animate-bounce" />
+                    <p className="text-[10px] font-black text-slate-700">{language === 'fr' ? "Glisser votre logo ou Importer" : "Drag your logo or Browse"}</p>
+                    <p className="text-[8px] text-slate-450 mt-0.5">{language === 'fr' ? "Formats PNG, JPG, SVG, WEBP transparents" : "Supports transparent PNG, SVG, JPG, WEBP"}</p>
+                  </div>
+                )}
+
+                {/* Hideable Text input fallback for logo URL */}
+                <div className="flex justify-between items-center text-[9px] pt-1.5 border-t border-slate-100">
+                  <span className="text-slate-400 font-semibold">{language === 'fr' ? "Fichier léger recommandé (<2Mo)" : "Light file recommended (<2MB)"}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlLogoInput(!showUrlLogoInput)}
+                    className="text-indigo-600 hover:text-indigo-800 font-extrabold cursor-pointer"
+                  >
+                    {showUrlLogoInput ? (language === 'fr' ? "Masquer URL" : "Hide URL") : (language === 'fr' ? "Entrer URL de l'image" : "Use logo URL link")}
+                  </button>
+                </div>
+
+                {showUrlLogoInput && (
+                  <div className="pt-1 animate-in slide-in-from-top-1 duration-100">
+                    <input
+                      id="persistent-input-logo-url"
+                      type="text"
+                      placeholder={language === 'fr' ? "Lien absolu vers l'image du logo (ex: https://...)" : "Absolute image URL link (e.g. https://...)"}
+                      value={settings.logoUrl || ""}
+                      onChange={(e) => onUpdateSettings({ ...settings, logoUrl: e.target.value })}
+                      className="w-full bg-white border border-slate-205 text-slate-800 rounded-md py-1 px-2 text-[9.5px] focus:ring-1 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* 1. SELECTION DU CANAL/FORMAT DE CRÉATION */}
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-205 space-y-2">
               <div className="flex items-center justify-between">
@@ -1081,6 +1219,15 @@ export default function Sidebar({
                               setPrompt(chosenObj);
                               handleSelectPlatform(opt.platform);
                               setScriptVibe(opt.vibe);
+
+                              if (opt.id === 'saas_product') {
+                                onUpdateCampaignType('video-animated');
+                              } else if (opt.id === 'concept_explainer') {
+                                onUpdateCampaignType('static-carousel');
+                              } else if (opt.id === 'brand_story') {
+                                onUpdateCampaignType('linkedin-3-posts');
+                              }
+
                               setCompanionStep(2);
                             }}
                             className="w-full text-left p-2.5 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/10 rounded-xl text-xs font-black text-slate-705 transition cursor-pointer flex justify-between items-center"
@@ -1818,7 +1965,7 @@ export default function Sidebar({
                 </div>
 
                 {/* Step 1: Analyze Website & Extract Core Sequences (The Descript feature) with Parallel Logo Integration */}
-                <div id="step-analyze-container" className="space-y-3.5 border-t border-slate-100 pt-4">
+                <div id="step-analyze-container" className="hidden">
                   <div>
                     <label className="text-[11.5px] font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
                       <span>{t.step_analyze}</span>
