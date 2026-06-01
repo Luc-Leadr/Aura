@@ -375,7 +375,7 @@ URL domain or brand: "${url}"
 // 2. Generate Storyboard / Script API
 app.post("/api/generate-storyboard", async (req, res) => {
   try {
-    const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4, workingLanguage = "fr" } = req.body;
+    const { prompt, url, aspectRatio, visualTheme, scriptVibe, slideCount = 4, workingLanguage = "fr", campaignType = "video-animated" } = req.body;
     const ai = getGeminiClient();
 
     let scrapedContext = "";
@@ -403,10 +403,42 @@ app.post("/api/generate-storyboard", async (req, res) => {
 
     const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
     const targetLangLabel = workingLanguage === "en" ? "English" : "French";
+
+    let campaignInstruct = "";
+    if (campaignType === "static-carousel") {
+      campaignInstruct = `
+THE USER CHOSE FORMAT: 'static-carousel' (BRAND CAROUSEL & VISUAL SLIDESHOW).
+- Focus on producing sequential slides suitable for a PDF deck or carousel on LinkedIn/Instagram.
+- Ensure each slide flows systematically to educate the reader.
+- Explicitly add page numbers (e.g. "1/${slideCount}", "2/${slideCount}") inside each slide's 'title' or 'subtitle' to clearly establish the deck structure.
+- Make the slides look highly elegant and structured for business presentation, with a strong introductory page and a clean final CTA slide.
+- Avoid video-specific speakable instructions (e.g., do not say 'see the video below'); write narrator scripts that are informative and descriptive of the slide's facts.
+`;
+    } else if (campaignType === "linkedin-3-posts") {
+      campaignInstruct = `
+THE USER CHOSE FORMAT: 'linkedin-3-posts' (3 WRITTEN CAMPAIGN POSTS).
+- While still generating visual slides, devote outstanding professional copywriter quality to crafting the 'suggestedLinkedinPosts' array.
+- These 3 posts MUST have entirely different structures and angles:
+  - Post 1: Problem hook & bold resolution. Focus on a painful friction and introduce your service/business.
+  - Post 2: Product features & precise benefits. Showcase concrete features found on the target website.
+  - Post 3: Brand vision & convictions. Focus on the human team, company culture, origin story, or deep brand alignment with customer success, paired with a solid CTA.
+- Format all 3 posts beautifully with elegant lines, whitespace, clear headings, bullet points, and high conversational fluidness in ${targetLangLabel}.
+`;
+    } else {
+      campaignInstruct = `
+THE USER CHOSE FORMAT: 'video-animated' (DYNAMIC SHORT VIDEO).
+- Optimize subtitles for smooth high-retention speech voiceover narration (approx. 10-14 words per scene).
+- The subtitles must flow like a spoken voice actor with perfect cadence.
+- Ensure visual entry animations provide energetic motion vibes suitable for video timeline execution.
+`;
+    }
+
     const instruction = `
 You are an award-winning creative director, copywriter, and motion designer. Your task is to analyze the input (and any scraped website context/headings) and generate BOTH:
-1. A highly engaging, high-conversion short-form video storyboard/script.
-2. A professionally formatted, engaging written LinkedIn post tailored perfectly to the website, explaining its core propositions in a captivating, structured, human way.
+1. A highly engaging, high-conversion visual design and content brief matching the chosen campaign format.
+2. A professionally formatted, engaging written LinkedIn post campaign tailored perfectly to the website.
+
+${campaignInstruct}
 
 CRITICAL BRAND ALIGNMENT & SPECIFICITY (ANTI-SLOP & ANTI-JARGON):
 - You are STRICTLY FORBIDDEN from generating generic marketing clichés like "Expertise Sur Mesure", "Votre Vitrine", "Boostez vos ventes", "Votre Partenaire", "Solutions Innovantes", "LINKEDIN VOTRE VITRINE ???", "DÉCOUVREZ NOTRE SITE", "GAGNEZ DU TEMPS", "ACCÉLÉREZ VOTRE SUCCÈS" or other generic filler copy.

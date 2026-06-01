@@ -197,7 +197,7 @@ export default function App() {
   };
 
   // Triggers main server analysis & storyboard creation endpoint
-  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en' }) => {
+  const handleGenerateStoryboard = async (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en'; campaignType?: 'video-animated' | 'static-carousel' | 'linkedin-3-posts' }) => {
     setIsGenerating(true);
     setGlobalError(null);
     
@@ -244,7 +244,8 @@ export default function App() {
           visualTheme: project.settings.visualTheme,
           scriptVibe: payload.scriptVibe,
           slideCount: payload.slideCount,
-          workingLanguage: payload.workingLanguage
+          workingLanguage: payload.workingLanguage,
+          campaignType: payload.campaignType || campaignType
         })
       });
 

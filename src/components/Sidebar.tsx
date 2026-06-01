@@ -34,7 +34,7 @@ interface SidebarProps {
   settings: ProjectSettings;
   onUpdateSettings: (s: ProjectSettings) => void;
   onUpdateProject?: (p: Project) => void;
-  onGenerateStoryboard: (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en' }) => Promise<void>;
+  onGenerateStoryboard: (payload: { prompt: string; url: string; scriptVibe: string; slideCount: number; workingLanguage: 'fr' | 'en'; campaignType: 'video-animated' | 'static-carousel' | 'linkedin-3-posts' }) => Promise<void>;
   isGenerating: boolean;
   language: 'fr' | 'en';
   setLanguage: (lang: 'fr' | 'en') => void;
@@ -625,7 +625,8 @@ export default function Sidebar({
       url, 
       scriptVibe,
       slideCount: activeSlideCount,
-      workingLanguage
+      workingLanguage,
+      campaignType
     });
   };
 
@@ -1248,6 +1249,70 @@ export default function Sidebar({
                                     <p>⚡ <strong>{language === 'fr' ? 'Slogan :' : 'Slogan :'}</strong> &ldquo;{analysisResult.suggestedSlogan}&rdquo;</p>
                                     <p className="text-slate-500 italic mt-1 font-normal line-clamp-2">“{analysisResult.understandingSummary}”</p>
                                   </div>
+                                  
+                                  {/* Section Logo de Marque - Direct interactive upload inside current brief */}
+                                  <div className="border-t border-slate-200/50 pt-2.5 mt-1 space-y-1.5 text-left">
+                                    <span className="text-[9.5px] font-black text-indigo-950 uppercase tracking-tight block">
+                                      🎨 {language === 'fr' ? "Logo de l'entreprise (facultatif) :" : "Brand logo (Optional) :"}
+                                    </span>
+                                    {settings.logoUrl ? (
+                                      <div className="flex items-center gap-2 bg-white border border-slate-205 p-1.5 rounded-lg">
+                                        <div className="bg-slate-50 border p-0.5 rounded w-8 h-8 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                          <img src={settings.logoUrl} alt="Logo Prev" className="max-w-full max-h-full object-contain" />
+                                        </div>
+                                        <span className="text-[9px] text-slate-500 font-bold truncate flex-grow">
+                                          {language === 'fr' ? "Logo connecté !" : "Logo linked!"}
+                                        </span>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => onUpdateSettings({ ...settings, logoUrl: "" })}
+                                          className="p-1 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const fileInput = document.getElementById("companion-url-logo-file-input");
+                                            fileInput?.click();
+                                          }}
+                                          className="flex-grow py-1.5 px-2.5 bg-slate-100 hover:bg-slate-150 border border-slate-200 hover:border-indigo-400 text-slate-700 text-[10px] font-extrabold rounded-lg text-center cursor-pointer flex items-center justify-center gap-1.5"
+                                        >
+                                          <Upload className="w-3 h-3 text-indigo-505" />
+                                          {language === 'fr' ? "Importer (JPG/PNG)" : "Upload (JPG/PNG)"}
+                                        </button>
+                                        <input
+                                          id="companion-url-logo-file-input"
+                                          type="file"
+                                          accept="image/png, image/jpeg, image/jpg"
+                                          onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                              const file = e.target.files[0];
+                                              const reader = new FileReader();
+                                              reader.onloadend = () => {
+                                                onUpdateSettings({ ...settings, logoUrl: reader.result as string });
+                                              };
+                                              reader.readAsDataURL(file);
+                                            }
+                                          }}
+                                          className="hidden"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const u = window.prompt(language === 'fr' ? "Collez l'adresse URL absolue de votre logo (PNG/SVG) :" : "Paste your absolute logo image URL (PNG/SVG):");
+                                            if (u) onUpdateSettings({ ...settings, logoUrl: u });
+                                          }}
+                                          className="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-500 hover:text-slate-800 text-[9px] font-bold rounded-lg cursor-pointer"
+                                        >
+                                          URL
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
 
                                   <div className="border-t border-slate-200/50 pt-2 flex justify-between gap-2">
                                     <button
@@ -1275,7 +1340,7 @@ export default function Sidebar({
 
                           {/* MANUAL FREE TEXT SUBWIDGET */}
                           {companionHasUrl === false && (
-                            <div className="space-y-1.5 animate-in slide-in-from-bottom-2 duration-200">
+                            <div className="space-y-3.5 animate-in slide-in-from-bottom-2 duration-200">
                               <textarea
                                 placeholder={language === 'fr' ? "Mettez ici vos mots clés, caractéristiques authentiques (ex: 'Écriture Ghostwriting', 'Calendrier de Publication', 'Planificateur LinkedIn')..." : "Enter your features, real facts (e.g. 'LinkedIn publishing calendar', 'automated caching layers')..."}
                                 value={companionManualInputText}
@@ -1283,6 +1348,71 @@ export default function Sidebar({
                                 rows={3}
                                 className="w-full bg-white border border-slate-205 text-slate-850 rounded-lg py-2 px-3 text-xs focus:ring-1 focus:ring-indigo-500 leading-normal font-semibold"
                               />
+
+                              {/* Section Logo de Marque - Direct interactive upload for manual briefs */}
+                              <div className="border-t border-slate-200/50 pt-2.5 mt-1 space-y-1.5 text-left">
+                                <span className="text-[9.5px] font-black text-indigo-950 uppercase tracking-tight block">
+                                  🎨 {language === 'fr' ? "Logo de l'entreprise (facultatif) :" : "Brand logo (Optional) :"}
+                                </span>
+                                {settings.logoUrl ? (
+                                  <div className="flex items-center gap-2 bg-white border border-slate-205 p-1.5 rounded-lg">
+                                    <div className="bg-slate-50 border p-0.5 rounded w-8 h-8 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                      <img src={settings.logoUrl} alt="Logo Prev" className="max-w-full max-h-full object-contain" />
+                                    </div>
+                                    <span className="text-[9px] text-slate-500 font-bold truncate flex-grow">
+                                      {language === 'fr' ? "Logo connecté !" : "Logo linked!"}
+                                    </span>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => onUpdateSettings({ ...settings, logoUrl: "" })}
+                                      className="p-1 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const fileInput = document.getElementById("companion-manual-logo-file-input");
+                                        fileInput?.click();
+                                      }}
+                                      className="flex-grow py-1.5 px-2.5 bg-slate-100 hover:bg-slate-150 border border-slate-200 hover:border-indigo-400 text-slate-700 text-[10px] font-extrabold rounded-lg text-center cursor-pointer flex items-center justify-center gap-1.5"
+                                    >
+                                      <Upload className="w-3 h-3 text-indigo-550" />
+                                      {language === 'fr' ? "Importer (JPG/PNG)" : "Upload (JPG/PNG)"}
+                                    </button>
+                                    <input
+                                      id="companion-manual-logo-file-input"
+                                      type="file"
+                                      accept="image/png, image/jpeg, image/jpg"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          const file = e.target.files[0];
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            onUpdateSettings({ ...settings, logoUrl: reader.result as string });
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const u = window.prompt(language === 'fr' ? "Collez l'adresse URL absolue de votre logo (PNG/SVG) :" : "Paste your absolute logo image URL (PNG/SVG):");
+                                        if (u) onUpdateSettings({ ...settings, logoUrl: u });
+                                      }}
+                                      className="px-2.5 py-1.5 bg-white border border-slate-200 text-slate-500 hover:text-slate-800 text-[9px] font-bold rounded-lg cursor-pointer"
+                                    >
+                                      URL
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
                               <div className="flex justify-between items-center mt-1">
                                 <button
                                   type="button"
@@ -1610,7 +1740,8 @@ export default function Sidebar({
                             url, 
                             scriptVibe,
                             slideCount: activeSlideCount,
-                            workingLanguage
+                            workingLanguage,
+                            campaignType
                           });
                         }}
                         className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 text-white shadow-md bg-indigo-600 hover:bg-indigo-700 transition cursor-pointer ${
