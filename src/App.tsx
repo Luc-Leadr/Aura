@@ -65,6 +65,11 @@ export default function App() {
     targetUrl?: string;
   } | null>(null);
 
+  // Advanced layout choices: visual carousel preview vs professional written LinkedIn post
+  const [campaignType, setCampaignType] = useState<'carousel' | 'linkedin-post'>('carousel');
+  const [suggestedLinkedinPost, setSuggestedLinkedinPost] = useState<string>("");
+  const [isAdjusting, setIsAdjusting] = useState(false);
+
   const t = I18N_DICTS[language];
 
   const handleUpdateSettings = (newSettings: ProjectSettings) => {
@@ -89,6 +94,82 @@ export default function App() {
     // clamp active index if necessary
     if (activeSceneIndex >= newScenes.length) {
       setActiveSceneIndex(Math.max(0, newScenes.length - 1));
+    }
+  };
+
+  // Real-time Copilot adjustment trigger via `/api/adjust-storyboard`
+  const handleAdjustStoryboard = async (feedback: string) => {
+    setIsAdjusting(true);
+    setGlobalError(null);
+    try {
+      const response = await fetch("/api/adjust-storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenes: project.scenes,
+          currentLinkedinPost: suggestedLinkedinPost,
+          feedback,
+          workingLanguage,
+          visualTheme: project.settings.visualTheme
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(language === 'fr' 
+          ? "Échec de l'ajustement interactif par Aura." 
+          : "Standard Copilot adjustment call failed."
+        );
+      }
+
+      const outcome = await response.json();
+      if (outcome.scenes && outcome.scenes.length > 0) {
+        const formattedScenes = outcome.scenes.map((scene: any, i: number) => ({
+          id: `adj-scene-${i}-${Date.now()}`,
+          duration: Number(scene.duration) || 5,
+          subtitle: scene.subtitle || "",
+          visual: {
+            title: scene.visual?.title || "Aura Message",
+            subtitle: scene.visual?.subtitle || "",
+            accentWord: scene.visual?.accentWord || "",
+            backgroundColor: scene.visual?.backgroundColor || "bg-gradient-to-br from-[#0f172a] to-[#1e293b]",
+            backgroundType: scene.visual?.backgroundType || "gradient",
+            textPosition: scene.visual?.textPosition || "center",
+            textStyle: scene.visual?.textStyle || "minimal",
+            animationType: scene.visual?.animationType || "fade",
+            assetKeywords: scene.visual?.assetKeywords || "abstract tech",
+            fontFamily: scene.visual?.fontFamily || "inter",
+            customAccentColor: scene.visual?.customAccentColor
+          },
+          audio: {
+            voiceName: scene.audio?.voiceName || "Zephyr",
+            speechSpeed: scene.audio?.speechSpeed || 1,
+            backgroundMusicVibe: scene.audio?.backgroundMusicVibe || "lofi",
+            volume: 0.8
+          },
+          transition: scene.transition || "fade"
+        }));
+
+        setProject(prev => ({
+          ...prev,
+          scenes: formattedScenes
+        }));
+
+        if (typeof outcome.suggestedLinkedinPost === 'string' && outcome.suggestedLinkedinPost.trim().length > 0) {
+          setSuggestedLinkedinPost(outcome.suggestedLinkedinPost);
+        }
+
+        if (outcome.suggestedSlogan) {
+          setFeedbackSlogan(outcome.suggestedSlogan);
+        }
+
+        setActiveSceneIndex(0);
+        setCurrentTime(0);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setGlobalError(err.message || "Impossible d'appliquer la correction sémantique.");
+    } finally {
+      setIsAdjusting(false);
     }
   };
 
@@ -226,6 +307,10 @@ export default function App() {
           },
           scenes: formattedScenes
         });
+
+        if (outcome.suggestedLinkedinPost) {
+          setSuggestedLinkedinPost(outcome.suggestedLinkedinPost);
+        }
 
         if (savedLogo) {
           setGenerationLogs(prev => [...prev, language === 'fr' ? `✨ Logotype de marque scanné et intégré.` : `✨ Scraped brand logotype integrated successfully.`]);
@@ -431,10 +516,16 @@ export default function App() {
             setHasGenerated(true);
           }}
           onAnalyzeWebsiteComplete={(data) => setScrapedBrand(data)}
+          campaignType={campaignType}
+          onUpdateCampaignType={setCampaignType}
+          suggestedLinkedinPost={suggestedLinkedinPost}
+          isAdjusting={isAdjusting}
+          onAdjustStoryboard={handleAdjustStoryboard}
+          hasGenerated={hasGenerated}
         />
 
         {/* Center Section: Video Preview Canvas + Log alerts + Séquence timeline */}
-        <main className="flex-1 flex flex-col bg-slate-100 justify-between overflow-hidden relative border-r border-slate-200/80">
+        <main className="flex-1 flex flex-col bg-slate-100 justify-between overflow-hidden relative border-r border-[#e5e7eb]">
           
           {/* Global error panel if exists */}
           {globalError && (
@@ -443,6 +534,40 @@ export default function App() {
               <div>
                 <p className="font-bold">Erreur de traitement sémantique</p>
                 <p className="text-[11px] text-red-700 mt-0.5">{globalError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Format view selector tab bar on generation complete */}
+          {hasGenerated && !isGenerating && (
+            <div className="flex bg-white border-b border-slate-200 p-2.5 items-center justify-between font-sans select-none gap-4">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">VUE DE LA COMPAGNE</span>
+                <span className="text-[9px] bg-indigo-100 text-indigo-700 font-extrabold px-2 py-0.5 rounded font-mono uppercase">Multi-Formats</span>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border">
+                <button
+                  type="button"
+                  onClick={() => setCampaignType('carousel')}
+                  className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
+                    campaignType === 'carousel'
+                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80 font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🎥 {language === 'fr' ? 'Carrousel Visuel' : 'Visual Carousel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCampaignType('linkedin-post')}
+                  className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
+                    campaignType === 'linkedin-post'
+                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80 font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  ✍️ {language === 'fr' ? 'Post Écrit LinkedIn' : 'LinkedIn Written Post'}
+                </button>
               </div>
             </div>
           )}
@@ -472,6 +597,81 @@ export default function App() {
                 ))}
               </div>
             </div>
+          ) : campaignType === 'linkedin-post' ? (
+            <div id="linkedin-post-preview" className="flex-1 flex items-center justify-center p-6 bg-slate-100 overflow-y-auto min-h-[300px]">
+              <div className="w-full max-w-[550px] bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5">
+                {/* LinkedIn Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    {project.settings.logoUrl ? (
+                      <img 
+                        src={project.settings.logoUrl} 
+                        alt="Company Logo" 
+                        referrerPolicy="no-referrer"
+                        className="w-11 h-11 rounded-md border object-contain bg-slate-50"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-black text-sm shrink-0">
+                        {project.settings.name.replace('Aura - ', '').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="text-left">
+                      <div className="flex items-center gap-1">
+                        <h4 className="text-xs font-black text-slate-900 truncate max-w-[180px]">
+                          {project.settings.name.replace('Aura - ', '').split('...')[0] || "Aura Campaign"}
+                        </h4>
+                        <span className="text-[10px] text-blue-500 font-bold">☑️</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-bold truncate max-w-[280px]">
+                        {feedbackSlogan || "Talk&Post intelligent platform"}
+                      </p>
+                      <p className="text-[9px] text-slate-400 flex items-center gap-1 font-semibold select-none mt-0.5">
+                        <span>1 h · </span>
+                        <span>🌐</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LinkedIn Editable Post Content */}
+                <div className="space-y-1.5 text-left">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-extrabold text-indigo-600 uppercase tracking-widest block font-mono">
+                      📝 {language === 'fr' ? "Édition de l'Editorial" : 'EDIT GENERATED POST'}
+                    </label>
+                    <span className="text-[8px] text-emerald-600 font-bold uppercase font-mono bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                      ✨ {language === 'fr' ? 'Garanti Sans Slop' : 'No Jargon Guaranteed'}
+                    </span>
+                  </div>
+                  <textarea
+                    value={suggestedLinkedinPost}
+                    onChange={(e) => setSuggestedLinkedinPost(e.target.value)}
+                    className="w-full bg-slate-50 text-slate-800 text-xs font-medium leading-relaxed p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-none h-[240px] transition font-sans shadow-2xs resize-y"
+                    placeholder="Générez un contenu sémantique à partir de votre site web..."
+                  />
+                </div>
+
+                {/* LinkedIn Actions */}
+                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+                  <div className="text-[9px] text-slate-400 flex gap-2 font-bold font-mono">
+                    <span>👍 42 Likes</span>
+                    <span>·</span>
+                    <span>💬 8 Comments</span>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(suggestedLinkedinPost);
+                      alert(language === 'fr' ? "Copié dans le presse-papiers !" : "Copied to clipboard!");
+                    }}
+                    className="py-1.5 px-3 bg-slate-900 hover:bg-black text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 hover:shadow-xs transition cursor-pointer"
+                  >
+                    <span>📋 {language === 'fr' ? 'Copier le Post' : 'Copy Post'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
             <VideoPlayer
               project={project}
@@ -492,7 +692,7 @@ export default function App() {
           )}
 
           {/* Bottom section: Sequence lists */}
-          {hasGenerated && project.scenes.length > 0 && (
+          {hasGenerated && campaignType === 'carousel' && project.scenes.length > 0 && (
             <Timeline
               project={project}
               activeSceneIndex={activeSceneIndex}

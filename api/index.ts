@@ -404,11 +404,14 @@ app.post("/api/generate-storyboard", async (req, res) => {
     const calculatedDuration = Math.max(3, Math.floor(18 / slideCount));
     const targetLangLabel = workingLanguage === "en" ? "English" : "French";
     const instruction = `
-You are an award-winning creative director and motion designer. Your task is to analyze the input (and any scraped website context/headings) and generate a highly engaging, high-conversion short-form video storyboard/script.
+You are an award-winning creative director, copywriter, and motion designer. Your task is to analyze the input (and any scraped website context/headings) and generate BOTH:
+1. A highly engaging, high-conversion short-form video storyboard/script.
+2. A professionally formatted, engaging written LinkedIn post tailored perfectly to the website, explaining its core propositions in a captivating, structured, human way.
 
-CRITICAL BRAND ALIGNMENT & THEME HONESTY:
-- You are STRICTLY FORBIDDEN from generating generic marketing clichés like "Expertise Sur Mesure", "Votre Vitrine", "Boostez vos ventes", "Votre Partenaire", "Solutions Innovantes", "LINKEDIN VOTRE VITRINE ???", "DÉCOUVREZ NOTRE SITE", "GAGNEZ DU TEMPS", "ACCÉLÉREZ VOTRE SUCCÈS" or other generic filler copy. This is low-quality AI slop.
-- Instead, you MUST study the provided headings and scraped context carefully. Capture the EXACT specific technical services, products, functional names, or core feature modules described in the crawled content (for example, if analyzing a LinkedIn writing tool like Talk&Post, use terms like "Éditeur Ghostwriting", "Planification de Posts", "Calendrier Éditorial", "Statistiques & Portée", instead of generic phrases).
+CRITICAL BRAND ALIGNMENT & SPECIFICITY (ANTI-SLOP & ANTI-JARGON):
+- You are STRICTLY FORBIDDEN from generating generic marketing clichés like "Expertise Sur Mesure", "Votre Vitrine", "Boostez vos ventes", "Votre Partenaire", "Solutions Innovantes", "LINKEDIN VOTRE VITRINE ???", "DÉCOUVREZ NOTRE SITE", "GAGNEZ DU TEMPS", "ACCÉLÉREZ VOTRE SUCCÈS" or other generic filler copy.
+- You are STRICTLY FORBIDDEN from translating terms or inventing specialized insider jargon that is NOT explicitly used on the website. For example, if a tool like Talk&Post is for LinkedIn writing, use simple, plain, accessible terms (e.g., "Planification de Posts", "Calendrier Éditorial", "Écriture simplifiée") instead of esoteric technical words like "Ghostwriting" which are only understood by an informed minority and distract from the core message.
+- Capture the absolute raw essence of what is directly visible on the scanned webpage. Use plain, high-converting, human-to-human language.
 - Build the slide 'title' (2-4 words max) and slide 'subtitle' directly using key terms, structural page headers, or quotes from the scanned website context and headings.
 
 SUBTLE & ENGAGING HUMAN COPYWRITING RULE:
@@ -426,8 +429,13 @@ STARK VISUAL CODE ENFORCEMENT:
 - The scene's 'textStyle' for stark-monochrome should default to 'minimal' or 'impact' to maintain pristine visual typography.
 - For stark-monochrome, the 'accentWord' must still identify a key word to highlight, but keep background and other visuals entirely void of colors.
 
+LINKEDIN TEXT POST COPYWRITING RULE:
+- Write a highly-engaging, fully-fleshed, professional LinkedIn text post in the 'suggestedLinkedinPost' parameter. It should fit the selected tone structure and brand objective.
+- It MUST utilize beautiful whitespace, simple bullet points of real features directly visible on the site (no jargon), a strong hook, and a clear call to action (CTA).
+- It MUST NOT use jargon like "ghostwriting" unless literally mentioned on the page. Keep it highly human, engaging, and professional.
+
 CRITICAL LANGUAGE RULE:
-The entire generated output - including all scene titles, scene subtitles, campaign slogan ('suggestedSlogan'), and speakable voiceover descriptions (the 'subtitle' property of each scene) MUST be written completely and fluently in ${targetLangLabel}. Do NOT mix English and French.
+The entire generated output - including all scene titles, scene subtitles, campaign slogan ('suggestedSlogan'), the LinkedIn text post ('suggestedLinkedinPost'), and speakable voiceover descriptions (the 'subtitle' property of each scene) MUST be written completely and fluently in ${targetLangLabel}. Do NOT mix English and French.
 
 The output will be used to animate a video preview timeline.
 Generate exactly ${slideCount} highly polished distinct scenes/slides corresponding to the core services, product benefits, or brand features of the user's business. Keep titles and descriptions extremely concise to optimize loading performance.
@@ -489,6 +497,10 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
               type: Type.STRING,
               description: "A primary high-converting brand slogan written for the campaign"
             },
+            suggestedLinkedinPost: {
+              type: Type.STRING,
+              description: "A highly-engaging, professionally crafted LinkedIn text post incorporating real features, simple headings, bullet points, and high-impact human language, without insider jargon"
+            },
             scenes: {
               type: Type.ARRAY,
               description: "Sequential list of animation scenes",
@@ -534,7 +546,7 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
               }
             }
           },
-          required: ["detectedTone", "suggestedSlogan", "scenes"]
+          required: ["detectedTone", "suggestedSlogan", "scenes", "suggestedLinkedinPost"]
         }
       }
     });
@@ -550,6 +562,123 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
   } catch (error: any) {
     console.error("Storyboard generation error:", error);
     res.status(500).json({ error: error.message || "An error occurred during AI generation." });
+  }
+});
+
+// A. Real-time Copilot adjustment of storyboard & LinkedIn post
+app.post("/api/adjust-storyboard", async (req, res) => {
+  try {
+    const { scenes, currentLinkedinPost, feedback, workingLanguage = "fr", visualTheme = "modern-dark" } = req.body;
+    if (!feedback || feedback.trim().length === 0) {
+      return res.status(400).json({ error: "Feedback instruction is required for adjustments." });
+    }
+
+    const ai = getGeminiClient();
+    const targetLangLabel = workingLanguage === "en" ? "English" : "French";
+
+    const instruction = `
+You are an expert creative director, senior copywriter, and visual supervisor.
+You are given a list of visual scenes/slides FOR A STORYBOARD and an existing LinkedIn written post.
+The user wants to make adjustments. Their feedback is: "${feedback}".
+
+CRITICAL ADJUSTMENT AND CONTROL RULE:
+- Your job is to process this feedback and apply it PRECISELY to both the scenes list and the LinkedIn written text post.
+- If they ask to modify or remove a specific word (for example, "ghostwriting" or "expert"), locate where it is used in the subtitles, titles, or LinkedIn post, and replace it with more simple, clean, accurate terms.
+- Follow the feedback literally. Raise the caliber of the copywriting to feel completely human, authentic, and high-conversion.
+- Keep other unchanged scenes and post structures stable and identical to preserve cohesion.
+- The outcome MUST be completely written in ${targetLangLabel}. Do NOT mix languages.
+- You are STRICTLY FORBIDDEN from adding low-quality AI marketing slogans ("boostez vos ventes", "expertise sur mesure").
+
+Provide the adjusted output in RAW JSON adhering EXACTLY to the specified output schema.
+`;
+
+    const userMessage = `
+ORIGINAL SCENES:
+${JSON.stringify(scenes, null, 2)}
+
+ORIGINAL LINKEDIN POST:
+"""
+${currentLinkedinPost || ""}
+"""
+
+USER ADJUSTMENT REQUEST: "${feedback}"
+CHOSEN VISUAL STYLE: "${visualTheme}"
+TARGET LANGUAGE: ${targetLangLabel}
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite",
+      contents: [
+        { text: instruction },
+        { text: userMessage }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            detectedTone: {
+              type: Type.STRING,
+              description: "The brand tone analysis results or adjustments"
+            },
+            suggestedSlogan: {
+              type: Type.STRING,
+              description: "A primary slogan adjusted if necessary"
+            },
+            suggestedLinkedinPost: {
+              type: Type.STRING,
+              description: "The fully adjusted LinkedIn written text post reflecting the user's feedback, with simple human headings and bullet points"
+            },
+            scenes: {
+              type: Type.ARRAY,
+              description: "The updated sequential list of visual storyboard scenes",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  duration: { type: Type.NUMBER },
+                  subtitle: { type: Type.STRING, description: "Text spoken by the voiceover during this scene, adjusted with the feedback" },
+                  visual: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      subtitle: { type: Type.STRING },
+                      accentWord: { type: Type.STRING },
+                      customAccentColor: { type: Type.STRING },
+                      backgroundColor: { type: Type.STRING },
+                      backgroundType: { type: Type.STRING },
+                      textPosition: { type: Type.STRING },
+                      textStyle: { type: Type.STRING },
+                      animationType: { type: Type.STRING },
+                      assetKeywords: { type: Type.STRING }
+                    },
+                    required: ["title", "backgroundColor", "backgroundType", "textPosition", "textStyle", "animationType"]
+                  },
+                  audio: {
+                    type: Type.OBJECT,
+                    properties: {
+                      voiceName: { type: Type.STRING },
+                      speechSpeed: { type: Type.NUMBER },
+                      backgroundMusicVibe: { type: Type.STRING }
+                    },
+                    required: ["voiceName", "speechSpeed", "backgroundMusicVibe"]
+                  },
+                  transition: { type: Type.STRING }
+                },
+                required: ["duration", "subtitle", "visual", "audio", "transition"]
+              }
+            }
+          },
+          required: ["detectedTone", "suggestedSlogan", "scenes", "suggestedLinkedinPost"]
+        }
+      }
+    });
+
+    const parsedData = safeExtractJson(response.text?.trim() || "{}");
+    res.json(parsedData);
+  } catch (error: any) {
+    console.error("Adjustment endpoint error:", error);
+    res.status(500).json({ error: error.message || "An error occurred during Copilot adjustment." });
   }
 });
 

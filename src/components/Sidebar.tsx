@@ -38,6 +38,12 @@ interface SidebarProps {
   setWorkingLanguage: (lang: 'fr' | 'en') => void;
   onLoadPresetDemo: () => void;
   onAnalyzeWebsiteComplete?: (data: any) => void;
+  campaignType: 'carousel' | 'linkedin-post';
+  onUpdateCampaignType: (t: 'carousel' | 'linkedin-post') => void;
+  suggestedLinkedinPost: string;
+  isAdjusting: boolean;
+  onAdjustStoryboard: (feedback: string) => Promise<void>;
+  hasGenerated: boolean;
 }
 
 export default function Sidebar({
@@ -51,12 +57,31 @@ export default function Sidebar({
   workingLanguage,
   setWorkingLanguage,
   onLoadPresetDemo,
-  onAnalyzeWebsiteComplete
+  onAnalyzeWebsiteComplete,
+  campaignType,
+  onUpdateCampaignType,
+  suggestedLinkedinPost,
+  isAdjusting,
+  onAdjustStoryboard,
+  hasGenerated
 }: SidebarProps) {
   const [prompt, setPrompt] = useState("");
   const [url, setUrl] = useState("");
   const [scriptVibe, setScriptVibe] = useState("energetic marketing");
   const [activeTab, setActiveTab] = useState<'create' | 'examples' | 'settings'>('create');
+  
+  // Interactive Live Copilot state
+  const [copilotFeedbackInput, setCopilotFeedbackInput] = useState("");
+  
+  const handleSendFeedbackToCopilot = async () => {
+    if (!copilotFeedbackInput.trim() || isAdjusting) return;
+    try {
+      await onAdjustStoryboard(copilotFeedbackInput);
+      setCopilotFeedbackInput("");
+    } catch (err) {
+      console.error("Adjustment handler failure:", err);
+    }
+  };
   
   // Website auto-proposition states
   const [analysisResult, setAnalysisResult] = useState<{
@@ -1816,6 +1841,59 @@ export default function Sidebar({
                 </button>
               </form>
             )}
+
+            {/* AURA DIRECT COPILOT ADVISOR IN CO-PILOT CHAT */}
+            {hasGenerated && (
+              <div id="aura-advisor-chat-sidebar" className="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 text-white p-4 rounded-2xl shadow-md space-y-3.5 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative">
+                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block absolute bottom-0 right-0 border-2 border-indigo-950 animate-ping" />
+                    <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block absolute bottom-0 right-0 border-2 border-slate-950" />
+                    <span className="text-xl">🤖</span>
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-[10px] font-black tracking-wider uppercase text-indigo-300 font-mono">AURA COPILOT ADVISOR</h4>
+                    <p className="text-[9px] text-indigo-300/80 font-bold">
+                      {language === 'fr' ? 'Échange de corrections en direct' : 'Live creative adjustments'}
+                    </p>
+                  </div>
+                </div>
+                
+                <p className="text-[11px] text-slate-200 leading-relaxed font-semibold text-left">
+                  {language === 'fr' 
+                    ? "Expliquez précisément vos correctifs (ex: 'Rend le texte plus formel', 'Enlève le mot ghostwriting de la scène 1', 'Mets plus d'émoticônes' ou 'Ajuste le style')."
+                    : "Direct Aura's creative output (e.g. 'Make it look much wilder', 'Remove the slang terminology', 'Add bold statements')."}
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder={language === 'fr' ? "Consignes d'ajustements..." : "Enter adjustment guidelines..."}
+                    value={copilotFeedbackInput}
+                    onChange={(e) => setCopilotFeedbackInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSendFeedbackToCopilot();
+                      }
+                    }}
+                    className="flex-1 min-w-0 bg-white/10 hover:bg-white/15 focus:bg-white border border-indigo-500/20 text-white font-semibold text-xs rounded-xl px-3 py-2 focus:text-slate-950 placeholder-indigo-300/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendFeedbackToCopilot}
+                    disabled={isAdjusting || !copilotFeedbackInput.trim()}
+                    className="p-2 px-3 bg-white text-indigo-950 font-black text-[10px] uppercase rounded-xl flex items-center justify-center shrink-0 border border-transparent hover:bg-slate-100 disabled:opacity-40 select-none transition cursor-pointer"
+                  >
+                    {isAdjusting ? (
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-indigo-900 border-t-transparent animate-spin" />
+                    ) : (
+                      language === 'fr' ? 'Corriger' : 'Adjust'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1920,6 +1998,42 @@ export default function Sidebar({
                 >
                   Vidéo MPEG (.mpg)
                 </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-3 border-t border-slate-200">
+              <h4 className="font-bold text-slate-705 flex items-center gap-1.5">
+                <span>📏</span> {language === 'fr' ? "Orientation & Format de Rendu" : "Orientation & Render Aspect"}
+              </h4>
+              <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">
+                {language === 'fr' 
+                  ? "Ajustez les dimensions géométriques idéales pour votre canal de diffusion."
+                  : "Change the geometric aspect ratio bounds tailored specifically to your media."}
+              </p>
+              
+              <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                {[
+                  { id: '9:16', label: '📱 Portrait', desc: '9:16' },
+                  { id: '1:1', label: '🔲 Carré', desc: '1:1' },
+                  { id: '16:9', label: '🖥️ Paysage', desc: '16:9' }
+                ].map((item) => {
+                  const isActive = settings.aspectRatio === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onUpdateSettings({ ...settings, aspectRatio: item.id as AspectRatio })}
+                      className={`py-2 px-1 rounded-xl border text-center font-bold cursor-pointer transition-all flex flex-col items-center justify-center shrink-0 ${
+                        isActive
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs font-extrabold'
+                          : 'border-slate-200 hover:border-slate-305 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="font-extrabold text-[10px]">{item.label}</span>
+                      <span className="text-[8px] font-mono tracking-tight opacity-70 mt-0.5">{item.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             
