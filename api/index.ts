@@ -474,7 +474,7 @@ URL domain or brand: "${url || 'No URL supplied'}"
 Target Aspect Ratio: "${aspectRatio || '9:16'}"
 Chosen Style Palette: "${visualTheme || 'modern-dark'}"
 
-Please design the exactly ${slideCount} scenes logically so they flow nicely from a hook (Scene 1) to the key product benefits/services (intermediate scenes) and a strong Call to Action (last scene). Keep it concise!
+Please design the exactly ${slideCount} scenes logically so they flow nicely from an engaging, jargon-free hook (Scene 1) to key product elements (intermediate scenes), and ensure that the final scene (the absolute last slide) MUST put forward and highlight the core values, corporate culture, or the main brand message of the enterprise represented by the website, paired with a clean, high-impact CTA. Keep everything highly concise and elegant!
 `;
 
     const response = await generateContentWithFallback(ai, {
@@ -500,6 +500,11 @@ Please design the exactly ${slideCount} scenes logically so they flow nicely fro
             suggestedLinkedinPost: {
               type: Type.STRING,
               description: "A highly-engaging, professionally crafted LinkedIn text post incorporating real features, simple headings, bullet points, and high-impact human language, without insider jargon"
+            },
+            suggestedLinkedinPosts: {
+              type: Type.ARRAY,
+              description: "Array of EXACTLY three distinct high-converting LinkedIn post variations. Post 1 must be focused on Hook & Cosmic Problem-solving. Post 2 must deep-dive on concrete Services/Product features found on the site. Post 3 must highlight core brand values, customer story, and human vision alongside a solid CTA.",
+              items: { type: Type.STRING }
             },
             scenes: {
               type: Type.ARRAY,
@@ -629,6 +634,11 @@ TARGET LANGUAGE: ${targetLangLabel}
             suggestedLinkedinPost: {
               type: Type.STRING,
               description: "The fully adjusted LinkedIn written text post reflecting the user's feedback, with simple human headings and bullet points"
+            },
+            suggestedLinkedinPosts: {
+              type: Type.ARRAY,
+              description: "Exactly three adjusted distinct high-converting LinkedIn post variations representing Post 1 (Hook & challenge), Post 2 (Topic detail showcase), and Post 3 (Values & CTA)",
+              items: { type: Type.STRING }
             },
             scenes: {
               type: Type.ARRAY,

@@ -502,26 +502,26 @@ export default function VideoPlayer({
                 </div>
               </div>
 
-              {/* Slogan Watermark label */}
-              <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-black/35 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 shadow-sm">
-                <div className="flex items-center gap-2 overflow-hidden max-w-[70%]">
+              {/* Slogan Watermark label - Prominent high-contrast bar representing company branding */}
+              <div id="company-watermark-bar" className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-black/75 backdrop-blur-lg px-3.5 py-2 rounded-xl border border-white/15 shadow-md">
+                <div className="flex items-center gap-2.5 overflow-hidden max-w-[75%]">
                   {project.settings.logoUrl ? (
                     <img 
                       src={project.settings.logoUrl} 
                       alt="Logo" 
-                      className="h-3.5 object-contain rounded opacity-90 brightness-110"
+                      className="h-5 max-w-[32px] object-contain rounded bg-white/10 p-0.5 border border-white/5 opacity-100 brightness-110 shadow-xs"
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   ) : (
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      project.settings.visualTheme === 'stark-monochrome' ? 'bg-white' : 'bg-indigo-500'
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${
+                      project.settings.visualTheme === 'stark-monochrome' ? 'bg-white' : 'bg-indigo-400'
                     }`} />
                   )}
-                  <span className="text-[8px] font-mono font-bold text-white/80 tracking-widest uppercase truncate">
-                    {project.settings.name}
+                  <span className="text-[9.5px] font-black text-white tracking-widest uppercase truncate">
+                    {project.settings.name.replace('Aura - ', '')}
                   </span>
                 </div>
-                <span className="text-[7.5px] px-1.5 py-0.5 rounded bg-white/15 text-white font-mono font-bold flex-shrink-0">
+                <span className="text-[8px] px-2 py-0.5 rounded bg-indigo-500 text-white font-mono font-black tracking-wider flex-shrink-0 uppercase">
                   {t.scene_number} {activeSceneIndex + 1}
                 </span>
               </div>

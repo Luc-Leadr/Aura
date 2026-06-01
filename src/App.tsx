@@ -65,9 +65,14 @@ export default function App() {
     targetUrl?: string;
   } | null>(null);
 
-  // Advanced layout choices: visual carousel preview vs professional written LinkedIn post
-  const [campaignType, setCampaignType] = useState<'carousel' | 'linkedin-post'>('carousel');
+  // Advanced layout choices: video-animated vs static-carousel vs linkedin-3-posts
+  const [campaignType, setCampaignType] = useState<'video-animated' | 'static-carousel' | 'linkedin-3-posts'>('video-animated');
   const [suggestedLinkedinPost, setSuggestedLinkedinPost] = useState<string>("");
+  const [suggestedLinkedinPosts, setSuggestedLinkedinPosts] = useState<string[]>([
+    "📍 [Concept & Accroche Unique]\n\nVotre marque mérite une visibilité à la hauteur de son excellence.\n\nPourquoi se contenter de visuels classiques quand vous pouvez avoir une identité de marque animée qui capte l'attention dès la première seconde ? Aura simplifie votre production publicitaire.\n\n✨ Analyse de site dynamique\n✨ Scénarisation IA sans jargon\n✨ Voix off synchronisées et directes\n\nPrêt à transformer vos pages web en clips haut-de-gamme ? Essayez le co-pilote d'Aura dès maintenant !",
+    "🚀 [Descript & Fonctionnalités Clés]\n\nInnover, c'est simplifier son message.\n\nComment Aura Motion Studio transforme-t-il la création ?\n\n1. Saisie de votre URL : Analyse de l'ADN sémantique du site.\n2. Storyboard validé : Sélection de tous vos thèmes clés réels.\n3. Rendu instantané : Animations soignées et voix-off adaptées.\n\nUne suite d'outils hautement optimisés pour les créateurs de produits, SaaS et pépites créatives.",
+    "🌟 [Valeurs & Vision d'Entreprise]\n\nLa clarté s'oppose au bruit numérique.\n\nChez Aura, nous concevons des formats élégants, épurés et hautement lisibles. Aucun slop IA superflu, aucune fioriture tape-à-l'œil.\n\nChaque mot, chaque typographie et chaque transition est soigneusement calibrée pour asseoir l'autorité professionnelle de votre structure.\n\nQuelles sont vos valeurs clés pour cette saison ?"
+  ]);
   const [isAdjusting, setIsAdjusting] = useState(false);
 
   const t = I18N_DICTS[language];
@@ -154,8 +159,25 @@ export default function App() {
           scenes: formattedScenes
         }));
 
-        if (typeof outcome.suggestedLinkedinPost === 'string' && outcome.suggestedLinkedinPost.trim().length > 0) {
+        if (outcome.suggestedLinkedinPosts && Array.isArray(outcome.suggestedLinkedinPosts) && outcome.suggestedLinkedinPosts.length > 0) {
+          setSuggestedLinkedinPosts(outcome.suggestedLinkedinPosts);
+          setSuggestedLinkedinPost(outcome.suggestedLinkedinPosts[0]);
+        } else if (typeof outcome.suggestedLinkedinPost === 'string' && outcome.suggestedLinkedinPost.trim().length > 0) {
           setSuggestedLinkedinPost(outcome.suggestedLinkedinPost);
+          const raw = outcome.suggestedLinkedinPost;
+          const pieces = raw.split(/---|\n\s*---\s*\n/g).map(p => p.trim()).filter(Boolean);
+          if (pieces.length >= 3) {
+            setSuggestedLinkedinPosts(pieces.slice(0, 3));
+          } else {
+            const p1 = raw;
+            const p2 = workingLanguage === 'fr'
+              ? `🚀 [Innover par l'Offre]\n\nChaque thématique identifiée sur votre site possède une valeur intrinsèque.\n\nFocalisez l'attention de vos prospects sur vos fonctionnalités en rationalisant votre communication produit avec l'assistant Aura.\n\n${raw}`
+              : `🚀 [Innover with Features]\n\nEvery unique perspective found on your website drives a business value.\n\nTarget your audience clearly by streamlining your product benefits with Aura.\n\n${raw}`;
+            const p3 = workingLanguage === 'fr'
+              ? `🌟 [Histoire de Marque & Convictions]\n\nDerrière chaque technologie ou service scanné se trouvent des valeurs humaines fortes et indiscutables.\n\nC'est cette clarté qui fédère vos équipes et vos clients les plus engagés.`
+              : `🌟 [Our Grounding Values]\n\nBehind every piece of technology or service analyzed are true human convictions.\n\nIntegrity and precision build authentic professional standards. Join us!`;
+            setSuggestedLinkedinPosts([p1, p2, p3]);
+          }
         }
 
         if (outcome.suggestedSlogan) {
@@ -308,8 +330,25 @@ export default function App() {
           scenes: formattedScenes
         });
 
-        if (outcome.suggestedLinkedinPost) {
+        if (outcome.suggestedLinkedinPosts && Array.isArray(outcome.suggestedLinkedinPosts) && outcome.suggestedLinkedinPosts.length > 0) {
+          setSuggestedLinkedinPosts(outcome.suggestedLinkedinPosts);
+          setSuggestedLinkedinPost(outcome.suggestedLinkedinPosts[0]);
+        } else if (outcome.suggestedLinkedinPost) {
           setSuggestedLinkedinPost(outcome.suggestedLinkedinPost);
+          const raw = outcome.suggestedLinkedinPost;
+          const pieces = raw.split(/---|\n\s*---\s*\n/g).map(p => p.trim()).filter(Boolean);
+          if (pieces.length >= 3) {
+            setSuggestedLinkedinPosts(pieces.slice(0, 3));
+          } else {
+            const p1 = raw;
+            const p2 = workingLanguage === 'fr'
+              ? `🚀 [Innover par l'Offre]\n\nChaque thématique identifiée sur votre site possède une valeur intrinsèque.\n\nFocalisez l'attention de vos prospects sur vos fonctionnalités en rationalisant votre communication produit avec l'assistant Aura.\n\n${raw}`
+              : `🚀 [Innover with Features]\n\nEvery unique perspective found on your website drives a business value.\n\nTarget your audience clearly by streamlining your product benefits with Aura.\n\n${raw}`;
+            const p3 = workingLanguage === 'fr'
+              ? `🌟 [Histoire de Marque & Convictions]\n\nDerrière chaque technologie ou service scanné se trouvent des valeurs humaines fortes et indiscutables.\n\nC'est cette clarté qui fédère vos équipes et vos clients les plus engagés.`
+              : `🌟 [Our Grounding Values]\n\nBehind every piece of technology or service analyzed are true human convictions.\n\nIntegrity and precision build authentic professional standards. Join us!`;
+            setSuggestedLinkedinPosts([p1, p2, p3]);
+          }
         }
 
         if (savedLogo) {
@@ -541,32 +580,43 @@ export default function App() {
           {/* Format view selector tab bar on generation complete */}
           {hasGenerated && !isGenerating && (
             <div className="flex bg-white border-b border-slate-200 p-2.5 items-center justify-between font-sans select-none gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">VUE DE LA COMPAGNE</span>
-                <span className="text-[9px] bg-indigo-100 text-indigo-700 font-extrabold px-2 py-0.5 rounded font-mono uppercase">Multi-Formats</span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Format de Rendu</span>
+                <span className="text-[9px] bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded border border-indigo-200 font-mono uppercase">Multi-Output Active</span>
               </div>
               <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border">
                 <button
                   type="button"
-                  onClick={() => setCampaignType('carousel')}
+                  onClick={() => setCampaignType('video-animated')}
                   className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
-                    campaignType === 'carousel'
-                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80 font-black'
-                      : 'text-slate-500 hover:text-slate-800'
+                    campaignType === 'video-animated'
+                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800 font-semibold'
                   }`}
                 >
-                  🎥 {language === 'fr' ? 'Carrousel Visuel' : 'Visual Carousel'}
+                  🎥 {language === 'fr' ? 'Vidéo Animée Motion' : 'Animated Video'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCampaignType('linkedin-post')}
+                  onClick={() => setCampaignType('static-carousel')}
                   className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
-                    campaignType === 'linkedin-post'
-                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80 font-black'
-                      : 'text-slate-500 hover:text-slate-800'
+                    campaignType === 'static-carousel'
+                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800 font-semibold'
                   }`}
                 >
-                  ✍️ {language === 'fr' ? 'Post Écrit LinkedIn' : 'LinkedIn Written Post'}
+                  🗂️ {language === 'fr' ? 'Carrousel Slides' : 'Slide Carousel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCampaignType('linkedin-3-posts')}
+                  className={`py-1.5 px-3 rounded-lg text-[10px] font-black tracking-tight transition-all cursor-pointer ${
+                    campaignType === 'linkedin-3-posts'
+                      ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/80'
+                      : 'text-slate-500 hover:text-slate-800 font-semibold'
+                  }`}
+                >
+                  ✍️ {language === 'fr' ? '3 Posts LinkedIn Rédigés' : '3 Draft LinkedIn Posts'}
                 </button>
               </div>
             </div>
@@ -597,79 +647,159 @@ export default function App() {
                 ))}
               </div>
             </div>
-          ) : campaignType === 'linkedin-post' ? (
-            <div id="linkedin-post-preview" className="flex-1 flex items-center justify-center p-6 bg-slate-100 overflow-y-auto min-h-[300px]">
-              <div className="w-full max-w-[550px] bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5">
-                {/* LinkedIn Header */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {project.settings.logoUrl ? (
-                      <img 
-                        src={project.settings.logoUrl} 
-                        alt="Company Logo" 
-                        referrerPolicy="no-referrer"
-                        className="w-11 h-11 rounded-md border object-contain bg-slate-50"
-                      />
-                    ) : (
-                      <div className="w-11 h-11 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-black text-sm shrink-0">
-                        {project.settings.name.replace('Aura - ', '').charAt(0).toUpperCase()}
+          ) : campaignType === 'linkedin-3-posts' ? (
+            <div id="linkedin-multiclass-preview" className="flex-1 flex flex-col p-6 bg-slate-100 overflow-y-auto min-h-[300px] gap-6 scrollbar-thin">
+              <div className="border border-slate-200 bg-white/75 p-4 rounded-xl max-w-4xl mx-auto w-full text-center space-y-1">
+                <p className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono"> campagne éditoriale de 3 posts linkedin </p>
+                <p className="text-[10px] text-slate-450 font-medium">Trois approches complémentaires rédigées par Aura à partir des thèmes validés sur votre site web.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full">
+                {suggestedLinkedinPosts.map((postBody, postIdx) => (
+                  <div key={postIdx} className="bg-white border border-slate-210 rounded-2xl shadow-xs p-5 flex flex-col justify-between space-y-4 hover:border-indigo-300 transition duration-200">
+                    <div className="space-y-4">
+                      {/* Brand Header */}
+                      <div className="flex items-start gap-2.5">
+                        {project.settings.logoUrl ? (
+                          <div className="bg-white p-0.5 border rounded-md">
+                            <img 
+                              src={project.settings.logoUrl} 
+                              alt="Company Logo" 
+                              className="w-9 h-9 rounded object-contain"
+                              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-extrabold text-[11px] shrink-0">
+                            {project.settings.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="text-left select-none overflow-hidden flex-1">
+                          <div className="flex items-center gap-0.5">
+                            <h4 className="text-[11px] font-black text-slate-800 truncate">
+                              {project.settings.name.replace('Aura - ', '').split('...')[0] || "Aura ad campaign"}
+                            </h4>
+                            <span className="text-[9px] text-blue-500 font-bold">☑️</span>
+                          </div>
+                          <span className="text-[8.5px] text-slate-400 font-bold block truncate">
+                            {feedbackSlogan || "Aura Production"}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    <div className="text-left">
-                      <div className="flex items-center gap-1">
-                        <h4 className="text-xs font-black text-slate-900 truncate max-w-[180px]">
-                          {project.settings.name.replace('Aura - ', '').split('...')[0] || "Aura Campaign"}
-                        </h4>
-                        <span className="text-[10px] text-blue-500 font-bold">☑️</span>
+
+                      {/* Post number indicator */}
+                      <div className="flex justify-between items-center bg-slate-50 border px-2 py-1 rounded-lg text-[9px] font-bold font-mono">
+                        <span className="text-indigo-600">POST DRAFT #{postIdx + 1}</span>
+                        <span className="text-slate-400">
+                          {postIdx === 0 ? "Problem & Hook" : postIdx === 1 ? "Feature Highlight" : "Values & CTA"}
+                        </span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold truncate max-w-[280px]">
-                        {feedbackSlogan || "Talk&Post intelligent platform"}
-                      </p>
-                      <p className="text-[9px] text-slate-400 flex items-center gap-1 font-semibold select-none mt-0.5">
-                        <span>1 h · </span>
-                        <span>🌐</span>
-                      </p>
+
+                      {/* Editable Text Area */}
+                      <div className="space-y-1 text-left">
+                        <textarea
+                          value={postBody}
+                          onChange={(e) => {
+                            const updated = [...suggestedLinkedinPosts];
+                            updated[postIdx] = e.target.value;
+                            setSuggestedLinkedinPosts(updated);
+                            if (postIdx === 0) setSuggestedLinkedinPost(e.target.value);
+                          }}
+                          className="w-full bg-slate-50/75 hover:bg-slate-50 focus:bg-white text-slate-850 text-[11px] leading-relaxed p-3.5 border border-slate-205 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:outline-none h-[280px] transition font-sans resize-none font-medium text-left"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Footer stats & copy button */}
+                    <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                      <span className="text-[9.5px] text-slate-450 font-bold font-mono">
+                        👍 {12 + postIdx * 14} • 💬 {2 + postIdx}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(postBody);
+                          alert(language === 'fr' ? `Post #${postIdx + 1} copié !` : `Post #${postIdx + 1} copied!`);
+                        }}
+                        className="py-1 px-2.5 bg-slate-900 hover:bg-black text-white rounded-lg text-[9.5px] font-bold flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <span>📋 {language === 'fr' ? 'Copier' : 'Copy'}</span>
+                      </button>
                     </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
+          ) : campaignType === 'static-carousel' ? (
+            <div id="static-carousel-preview" className="flex-1 flex flex-col p-6 bg-slate-100 overflow-y-auto min-h-[300px] scrollbar-thin select-none">
+              <div className="border border-slate-200 bg-white/75 p-3.5 rounded-xl max-w-4xl mx-auto w-full text-center space-y-0.5 mb-6">
+                <p className="text-xs font-black text-slate-700 uppercase tracking-wider font-mono"> carrousel de slides séquentielles </p>
+                <p className="text-[10px] text-slate-450 font-medium">Visualisez l'exhaustivité de votre story-board sous forme de carrousel statique pour LinkedIn / Instagram.</p>
+              </div>
 
-                {/* LinkedIn Editable Post Content */}
-                <div className="space-y-1.5 text-left">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[9px] font-extrabold text-indigo-600 uppercase tracking-widest block font-mono">
-                      📝 {language === 'fr' ? "Édition de l'Editorial" : 'EDIT GENERATED POST'}
-                    </label>
-                    <span className="text-[8px] text-emerald-600 font-bold uppercase font-mono bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                      ✨ {language === 'fr' ? 'Garanti Sans Slop' : 'No Jargon Guaranteed'}
-                    </span>
-                  </div>
-                  <textarea
-                    value={suggestedLinkedinPost}
-                    onChange={(e) => setSuggestedLinkedinPost(e.target.value)}
-                    className="w-full bg-slate-50 text-slate-800 text-xs font-medium leading-relaxed p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:outline-none h-[240px] transition font-sans shadow-2xs resize-y"
-                    placeholder="Générez un contenu sémantique à partir de votre site web..."
-                  />
-                </div>
+              {/* Horizontal Scroll Deck */}
+              <div className="flex gap-6 pb-4 overflow-x-auto w-full max-w-6xl mx-auto scrollbar-thin px-2 justify-center">
+                {project.scenes.map((scene, idx) => {
+                  const isLastScene = idx === project.scenes.length - 1;
+                  return (
+                    <div 
+                      key={scene.id} 
+                      onClick={() => setActiveSceneIndex(idx)}
+                      className={`flex-shrink-0 w-[240px] aspect-[9/16] bg-slate-950 rounded-2xl overflow-hidden relative border-2 cursor-pointer transition ${
+                        activeSceneIndex === idx ? 'border-indigo-600 ring-2 ring-indigo-500/20 shadow-md scale-102' : 'border-slate-300 hover:border-slate-400'
+                      }`}
+                    >
+                      {/* Slide Watermark label */}
+                      <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex justify-between items-center bg-black/45 backdrop-blur-md px-2 py-1 rounded-lg border border-white/5">
+                        <span className="text-[7px] text-white/90 font-black truncate max-w-[70%]">
+                          {project.settings.logoUrl ? "📁 " : "● "} {project.settings.name.replace('Aura - ', '').split('...')[0]}
+                        </span>
+                        <span className="text-[6.5px] px-1 py-0.2 rounded bg-indigo-500/80 text-white font-mono font-black shrink-0 uppercase">
+                          Slide {idx + 1}
+                        </span>
+                      </div>
 
-                {/* LinkedIn Actions */}
-                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                  <div className="text-[9px] text-slate-400 flex gap-2 font-bold font-mono">
-                    <span>👍 42 Likes</span>
-                    <span>·</span>
-                    <span>💬 8 Comments</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(suggestedLinkedinPost);
-                      alert(language === 'fr' ? "Copié dans le presse-papiers !" : "Copied to clipboard!");
-                    }}
-                    className="py-1.5 px-3 bg-slate-900 hover:bg-black text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 hover:shadow-xs transition cursor-pointer"
-                  >
-                    <span>📋 {language === 'fr' ? 'Copier le Post' : 'Copy Post'}</span>
-                  </button>
-                </div>
+                      {/* Image representation / background */}
+                      <div className="absolute inset-0 z-0">
+                        <div className={`absolute inset-0 bg-cover bg-center ${scene.visual.backgroundColor}`} />
+                        {scene.visual.backgroundType === 'image' && scene.visual.assetKeywords && (
+                          <img
+                            src={`https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=70&sig=${encodeURIComponent(scene.visual.assetKeywords)}`}
+                            alt="Visual element placeholder"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover opacity-20 filter blur-[1px]"
+                          />
+                        )}
+                      </div>
+
+                      {/* Slide Core Text Body */}
+                      <div className="absolute inset-0 p-4 flex flex-col justify-center items-center text-center z-10 bg-black/30">
+                        {scene.visual.subtitle && (
+                          <span className="text-[6.5px] tracking-widest uppercase font-bold text-white/50 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 backdrop-blur-3xs mb-2 truncate max-w-full">
+                            {scene.visual.subtitle}
+                          </span>
+                        )}
+                        <h3 className="text-white font-black text-xs md:text-[13px] uppercase tracking-wide leading-tight drop-shadow-md">
+                          {scene.visual.title}
+                        </h3>
+                        
+                        {/* Highlights Indicator */}
+                        {scene.visual.accentWord && (
+                          <span className="text-[8px] bg-white/15 border border-white/10 text-white font-extrabold px-1.5 py-0.5 rounded mt-2 uppercase">
+                            ✨ {scene.visual.accentWord}
+                          </span>
+                        )}
+
+                        {/* Last Scene specific visual callout */}
+                        {isLastScene && (
+                          <div className="absolute bottom-3 left-3 right-3 bg-indigo-550 border border-indigo-400 py-1 px-2 rounded-lg text-[6.5px] font-black text-white uppercase text-center leading-normal animate-pulse">
+                            🌟 {language === 'fr' ? 'Valeurs & Vision' : 'Values & Mission'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -692,7 +822,7 @@ export default function App() {
           )}
 
           {/* Bottom section: Sequence lists */}
-          {hasGenerated && campaignType === 'carousel' && project.scenes.length > 0 && (
+          {hasGenerated && campaignType === 'video-animated' && project.scenes.length > 0 && (
             <Timeline
               project={project}
               activeSceneIndex={activeSceneIndex}
